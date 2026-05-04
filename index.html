@@ -1,0 +1,1885 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>수(數)들의 전쟁: 심연의 규칙 최종판</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDK 연동 -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <style>
+        :root {
+            --parchment: #d4b483;
+            --ink: #1a1a1a;
+            --blood: #8a0303;
+            --magic: #6b21a8;
+            --forest-dark: #050801;
+            --glow-gold: rgba(212, 180, 131, 0.4);
+            --star-brown: #4a2e1b;
+        }
+
+        body {
+            font-family: 'Courier Prime', 'Noto Sans KR', monospace;
+            background-color: var(--forest-dark);
+            color: var(--parchment);
+            overflow: hidden;
+            touch-action: manipulation;
+            margin: 0;
+            padding: 0;
+        }
+
+        .vignette {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, transparent 30%, rgba(0,0,0,0.9) 100%);
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        .table-surface {
+            background-color: #121212;
+            background-image: url("https://www.transparenttextures.com/patterns/dark-wood.png");
+            box-shadow: inset 0 0 150px #000;
+        }
+
+        .card {
+            transition: all 0.2s ease-out;
+            background: var(--parchment);
+            color: var(--ink);
+            border: 2px solid #5d4037;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.6);
+            image-rendering: pixelated;
+            user-select: none;
+            position: relative;
+        }
+
+        .card.dragging { opacity: 0.5; transform: scale(1.05); box-shadow: 0 10px 25px rgba(0,0,0,0.8); }
+        .card.magic-card { background: #2a1b38; color: var(--parchment); border-color: #9333ea; }
+        .card.summoning-sickness { filter: grayscale(0.8) opacity(0.7); }
+        .card:hover:not(.disabled) { transform: translateY(-5px); filter: brightness(1.1); }
+        .card-selected { border-color: #fff !important; box-shadow: 0 0 20px #fff; transform: translateY(-10px) scale(1.05); z-index: 10; }
+        
+        .slot {
+            border: 2px dashed rgba(212, 180, 131, 0.15);
+            background: rgba(0,0,0,0.4);
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .slot.available { border-color: rgba(212, 180, 131, 0.5); background: rgba(212, 180, 131, 0.05); cursor: pointer; }
+        .slot.available:hover { background: rgba(212, 180, 131, 0.15); }
+        .slot-valid-target { border-color: #fbbf24 !important; background: rgba(251, 191, 36, 0.2) !important; box-shadow: 0 0 15px rgba(251, 191, 36, 0.5); cursor: pointer; }
+        .slot-invalid-target { border-color: #ef4444 !important; background: rgba(239, 68, 68, 0.2) !important; }
+
+        .hp-segment { height: 100%; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+
+        .base-number-display {
+            background: #000; border: 3px double var(--parchment);
+            box-shadow: 0 0 30px var(--glow-gold); animation: pulse-glow 3s infinite;
+        }
+        @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 15px var(--glow-gold); } 50% { box-shadow: 0 0 30px var(--glow-gold); } }
+
+        .action-point { width: 12px; height: 12px; border-radius: 50%; background: var(--parchment); box-shadow: 0 0 8px var(--parchment); }
+        .action-point.spent { background: #333; box-shadow: none; border: 1px solid var(--parchment); }
+
+        .screen { display: none; height: 100vh; width: 100vw; position: absolute; top: 0; left: 0; }
+        .screen.active { display: flex; }
+
+        .dice-anim { animation: dice-roll 0.6s ease-out; }
+        @keyframes dice-roll { 0% { transform: rotate(0deg) scale(0.5); opacity: 0; } 50% { transform: rotate(180deg) scale(1.2); } 100% { transform: rotate(360deg) scale(1); opacity: 1; } }
+        .blood-splatter { animation: splatter 0.6s ease-out forwards; pointer-events: none; }
+        @keyframes splatter { 0% { transform: scale(0); opacity: 1; } 100% { transform: scale(2.5); opacity: 0; } }
+
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .info-fade-in { animation: fadeIn 0.2s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .avatar-targetable { animation: targetPulse 1.5s infinite; border-color: #fbbf24; cursor: crosshair; }
+        @keyframes targetPulse { 0%, 100% { box-shadow: 0 0 5px #ef4444; } 50% { box-shadow: 0 0 30px #ef4444; } }
+
+        .magic-source-active { border-color: #a855f7 !important; box-shadow: 0 0 15px rgba(168,85,247,0.8); }
+
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-2px, -3px) rotate(-1deg); }
+            20% { transform: translate(-4px, 0px) rotate(2deg); }
+            30% { transform: translate(4px, 3px) rotate(0deg); }
+            40% { transform: translate(2px, -2px) rotate(2deg); }
+            50% { transform: translate(-2px, 3px) rotate(-1deg); }
+            60% { transform: translate(-4px, 2px) rotate(0deg); }
+            70% { transform: translate(4px, 2px) rotate(-2deg); }
+            80% { transform: translate(-2px, -2px) rotate(2deg); }
+            90% { transform: translate(2px, 3px) rotate(0deg); }
+            100% { transform: translate(2px, -3px) rotate(-1deg); }
+        }
+        .shake-screen { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+        
+        @keyframes damage-float {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            10% { transform: translateY(-10px) scale(1.5); }
+            100% { transform: translateY(-80px) scale(1); opacity: 0; }
+        }
+        .damage-text {
+            position: absolute;
+            color: #ff3333;
+            font-weight: 900;
+            font-size: 4rem;
+            text-shadow: 0 0 15px #000, 3px 3px 0px #8a0303;
+            pointer-events: none;
+            z-index: 200;
+            animation: damage-float 1s ease-out forwards;
+        }
+        
+        @keyframes flash-red {
+            0% { background-color: rgba(138, 3, 3, 0.5); }
+            100% { background-color: transparent; }
+        }
+        .flash-overlay { animation: flash-red 0.3s ease-out; }
+
+        .icon-btn { filter: grayscale(1) opacity(0.5); transition: all 0.2s; }
+        .icon-btn.selected { filter: grayscale(0) opacity(1); transform: scale(1.2); text-shadow: 0 0 15px var(--glow-gold); }
+        
+        .room-item { background: rgba(0,0,0,0.4); border: 1px solid rgba(212,180,131,0.2); transition: all 0.2s; }
+        .room-item:hover { border-color: rgba(212,180,131,0.8); background: rgba(212,180,131,0.05); }
+        .pulse-green { box-shadow: 0 0 8px #10b981; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body class="table-surface">
+    <div class="vignette"></div>
+
+    <div id="home-screen" class="screen active flex-col items-center justify-center p-4 z-10">
+        <div class="mb-12 text-center">
+            <h1 class="text-6xl md:text-8xl font-black mb-4 tracking-tighter" style="color: var(--parchment); text-shadow: 0 0 25px rgba(212, 180, 131, 0.5);">
+                수들의 전쟁
+            </h1>
+            <p class="text-xl opacity-60 italic tracking-widest">심연의 규칙 최종판</p>
+        </div>
+        <div class="flex flex-col gap-4 w-full max-w-[320px] items-center">
+            <button onclick="showScreen('stage-screen')" class="w-full py-4 border-2 border-[var(--parchment)] hover:bg-[var(--parchment)] hover:text-black transition-all font-bold text-2xl uppercase tracking-[0.3em] shadow-[0_0_15px_rgba(212,180,131,0.2)]">
+                계약 맺기
+            </button>
+            <button onclick="openProfileModal()" class="w-full py-3 border border-red-900 bg-red-950/30 text-red-400 hover:bg-red-900 hover:text-white transition-all font-bold text-lg uppercase tracking-widest shadow-[0_0_10px_rgba(153,27,27,0.4)]">
+                수의 전쟁 참여
+            </button>
+            <button onclick="startTutorialMatch()" class="w-full py-3 border border-purple-600/50 text-purple-300 hover:bg-purple-900/50 hover:text-white transition-all font-bold text-lg uppercase tracking-widest">
+                튜토리얼
+            </button>
+            <button onclick="showScreen('dictionary-screen')" class="text-xs opacity-50 hover:opacity-100 transition-all uppercase tracking-widest mt-4 border-b border-transparent hover:border-[var(--parchment)] pb-1">
+                심연의 기록
+            </button>
+        </div>
+    </div>
+
+    <!-- PVP 프로필 생성 모달 -->
+    <div id="profile-modal" class="fixed inset-0 hidden items-center justify-center z-[200] p-6 bg-black/95 backdrop-blur-md">
+        <div class="border-2 border-red-900 bg-[#0a0a0a] p-8 max-w-sm w-full shadow-[0_0_50px_rgba(153,27,27,0.4)] flex flex-col items-center">
+            <h3 class="text-2xl font-black mb-2 uppercase tracking-widest text-red-500">영혼 각인</h3>
+            <p class="text-xs opacity-50 mb-8 italic">투기장에 들어설 자네의 이름을 대게.</p>
+            
+            <input type="text" id="player-name-input" maxlength="8" placeholder="이름 (최대 8자)" 
+                   class="bg-transparent border-b border-red-900 p-2 text-center text-xl font-bold mb-8 focus:outline-none focus:border-red-500 text-[var(--parchment)] w-full placeholder-red-900/50">
+            
+            <p class="text-[10px] opacity-50 uppercase tracking-widest mb-4">아바타 선택</p>
+            <div class="flex gap-4 mb-8 text-3xl" id="icon-selector">
+                <button class="icon-btn selected" onclick="selectIcon(this, '🐺')">🐺</button>
+                <button class="icon-btn" onclick="selectIcon(this, '🦇')">🦇</button>
+                <button class="icon-btn" onclick="selectIcon(this, '🦉')">🦉</button>
+                <button class="icon-btn" onclick="selectIcon(this, '💀')">💀</button>
+                <button class="icon-btn" onclick="selectIcon(this, '👁️')">👁️</button>
+            </div>
+
+            <div class="flex w-full gap-3">
+                <button onclick="enterPvpLobby()" class="flex-grow py-3 bg-red-900 text-white text-sm font-bold uppercase hover:bg-red-700 transition-all">입장하기</button>
+                <button onclick="closeProfileModal()" class="px-4 py-3 border border-white/10 text-xs opacity-50 hover:opacity-100">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PVP 로비 화면 -->
+    <div id="pvp-lobby-screen" class="screen flex-col items-center p-6 overflow-y-auto z-10 hide-scrollbar">
+        <button onclick="exitLobby()" class="absolute top-6 left-6 text-red-500 hover:opacity-50 transition-all font-bold">
+            [ 투기장 나가기 ]
+        </button>
+        
+        <h2 class="text-4xl font-bold mt-16 mb-2 tracking-widest uppercase text-red-600">심연의 투기장</h2>
+        <div class="flex items-center gap-3 mb-10 border border-red-900 bg-red-950/20 px-4 py-2 rounded-full">
+            <span id="lobby-player-icon" class="text-xl">🐺</span>
+            <span id="lobby-player-name" class="text-sm font-bold text-[var(--parchment)] tracking-widest">이름없음</span>
+        </div>
+
+        <div class="w-full max-w-3xl flex flex-col gap-6 pb-20">
+            <div class="flex justify-between items-end border-b border-red-900/50 pb-4">
+                <div class="flex gap-4 items-center">
+                    <span class="text-sm font-bold uppercase tracking-widest text-[var(--parchment)]">열린 전장</span>
+                    <div class="flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full bg-emerald-500 pulse-green"></div>
+                        <span id="room-count" class="text-xs text-emerald-500 font-mono font-bold">0 ACTIVE</span>
+                    </div>
+                </div>
+                <button onclick="openCreateRoomModal()" class="px-6 py-2 bg-red-900 text-white font-bold text-xs uppercase tracking-widest hover:bg-red-700 transition-all shadow-[0_0_10px_rgba(153,27,27,0.5)]">
+                    방 만들기
+                </button>
+            </div>
+            <div id="room-list" class="flex flex-col gap-3 min-h-[300px]"></div>
+        </div>
+    </div>
+
+    <!-- 방 만들기 모달 -->
+    <div id="create-room-modal" class="fixed inset-0 hidden items-center justify-center z-[200] p-6 bg-black/95 backdrop-blur-md">
+        <div class="border-2 border-red-900 bg-[#0a0a0a] p-8 max-w-sm w-full shadow-[0_0_50px_rgba(153,27,27,0.4)]">
+            <h3 class="text-2xl font-black mb-6 uppercase tracking-widest text-red-500 text-center">전장 개설</h3>
+            <div class="flex flex-col gap-4 mb-8">
+                <label class="text-[10px] uppercase opacity-50 font-bold">전장의 이름 (계약명)</label>
+                <input type="text" id="room-name-input" maxlength="15" placeholder="심연의 이름을 정하게..." 
+                       class="bg-white/5 border-b border-red-900 p-3 text-sm focus:outline-none focus:border-red-500 text-[var(--parchment)] w-full">
+            </div>
+            <div class="flex gap-3">
+                <button onclick="createPvpRoom()" class="flex-grow py-3 bg-red-900 text-white text-sm font-bold uppercase hover:bg-red-700 transition-all">개설 및 대기</button>
+                <button onclick="closeCreateRoomModal()" class="px-4 py-3 border border-white/10 text-xs opacity-50 hover:opacity-100">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PVP 대기방 화면 -->
+    <div id="pvp-waiting-screen" class="screen flex-col items-center p-6 overflow-y-auto z-10 hide-scrollbar">
+        <button onclick="leaveWaitingRoom()" class="absolute top-6 left-6 text-red-500 hover:opacity-50 transition-all font-bold">
+            [ 전장 이탈 ]
+        </button>
+        <h2 id="waiting-room-title" class="text-3xl md:text-4xl font-black mt-16 mb-2 tracking-widest uppercase text-[var(--parchment)] shadow-[0_0_15px_rgba(212,180,131,0.2)]">방 제목</h2>
+        <p class="text-xs opacity-40 mb-12 italic text-center">피의 계약이 체결되기를 기다리고 있습니다...</p>
+
+        <div class="flex flex-col md:flex-row gap-8 w-full max-w-4xl justify-center items-stretch mb-12 relative">
+            <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-5xl md:text-6xl font-black text-red-900/50 italic tracking-widest z-0 pointer-events-none">VS</div>
+            
+            <div class="flex-1 border-2 border-[var(--parchment)] bg-black/80 p-8 flex flex-col items-center justify-center gap-4 relative z-10 shadow-[0_0_30px_rgba(212,180,131,0.15)] min-h-[250px]">
+                <span class="absolute top-3 left-3 text-[10px] text-yellow-500 font-bold tracking-widest uppercase border border-yellow-500/50 px-2 py-0.5 rounded-sm bg-black">개척자</span>
+                <div id="wait-host-icon" class="text-6xl mt-4 drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]">🐺</div>
+                <h3 id="wait-host-name" class="text-2xl font-bold text-[var(--parchment)] mt-2 tracking-wider">이름</h3>
+                <div id="wait-host-status" class="mt-4 text-sm font-bold text-gray-500 uppercase tracking-widest bg-black px-4 py-1 border border-white/10">준비 중...</div>
+            </div>
+
+            <div class="flex-1 border-2 border-red-900 bg-red-950/20 p-8 flex flex-col items-center justify-center gap-4 relative z-10 min-h-[250px]">
+                <div id="wait-challenger-content" class="w-full flex flex-col items-center hidden">
+                    <span class="absolute top-3 right-3 text-[10px] text-red-400 font-bold tracking-widest uppercase border border-red-400/50 px-2 py-0.5 rounded-sm bg-black">도전자</span>
+                    <div id="wait-challenger-icon" class="text-6xl mt-4 drop-shadow-[0_0_10px_rgba(255,0,0,0.5)]">🦇</div>
+                    <h3 id="wait-challenger-name" class="text-2xl font-bold text-red-400 mt-2 tracking-wider">상대 이름</h3>
+                    <div id="wait-challenger-status" class="mt-4 text-sm font-bold text-gray-500 uppercase tracking-widest bg-black px-4 py-1 border border-white/10">준비 중...</div>
+                    <button id="btn-kick" onclick="kickChallenger()" class="absolute bottom-3 right-3 text-[10px] border border-red-500 text-red-500 px-3 py-1 hover:bg-red-500 hover:text-black transition-all font-bold">추방하기</button>
+                </div>
+                <div id="wait-challenger-empty" class="w-full h-full flex flex-col items-center justify-center opacity-40 gap-4">
+                    <div class="text-4xl animate-bounce">⏳</div>
+                    <p class="text-xs uppercase tracking-widest font-bold">도전자를 기다리는 중...</p>
+                    <button id="btn-test-join" onclick="mockChallengerJoin()" class="text-[9px] border border-white/30 px-2 py-1 mt-4 hover:bg-white hover:text-black transition-all">[테스트용] 도전자 난입</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row gap-4 w-full max-w-lg">
+            <button id="btn-ready" onclick="toggleReady()" class="flex-1 py-4 border-2 border-emerald-600 bg-emerald-900/30 text-emerald-400 hover:bg-emerald-600 hover:text-white transition-all font-bold text-xl uppercase tracking-widest">
+                준비 (Ready)
+            </button>
+            <button id="btn-start" onclick="startPvpMatch()" class="flex-1 py-4 border-2 border-red-900 bg-red-950/50 text-red-500 font-bold text-xl uppercase tracking-widest opacity-50 cursor-not-allowed transition-all hidden" disabled>
+                전장 개방
+            </button>
+        </div>
+    </div>
+
+    <!-- 도감 화면 -->
+    <div id="dictionary-screen" class="screen flex-col items-center p-6 overflow-y-auto z-10 hide-scrollbar">
+        <button onclick="showScreen('home-screen')" class="absolute top-6 left-6 text-[var(--parchment)] hover:opacity-50 transition-all font-bold">
+            [ 되돌아가기 ]
+        </button>
+        <h2 class="text-4xl font-bold mt-16 mb-12 tracking-widest uppercase">심연의 기록</h2>
+        <div class="w-full max-w-4xl flex flex-col gap-12 pb-20">
+            <section>
+                <h3 class="text-2xl font-bold border-b border-[var(--parchment)] pb-2 mb-6 text-purple-400">기믹 (심연의 마법)</h3>
+                <div id="dict-magic-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            </section>
+            <section>
+                <h3 class="text-2xl font-bold border-b border-[var(--parchment)] pb-2 mb-6 text-cyan-400">특이점 (Special)</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="border border-cyan-900 bg-cyan-950/30 p-5 flex gap-6 items-center">
+                        <div class="card w-16 h-24 shrink-0 border-cyan-400 bg-cyan-100 text-cyan-900 flex flex-col items-center justify-center relative shadow-[0_0_10px_rgba(34,211,238,0.3)]">
+                            <div class="absolute top-1 text-[10px] text-[var(--star-brown)] font-black">★</div>
+                            <div class="text-3xl font-black">1</div>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-lg text-cyan-300 mb-2">희귀 카드 (1)</h4>
+                            <p class="text-xs opacity-80 leading-relaxed">모든 수의 약수. <span class="text-yellow-400 font-bold">자신 단 하나만 희생하여</span> 어떤 2성, 3성 카드든 즉시 소환할 수 있는 궁극의 제물입니다.</p>
+                        </div>
+                    </div>
+                    <div class="border border-blue-900 bg-blue-950/30 p-5 flex gap-6 items-center">
+                        <div class="card w-16 h-24 shrink-0 border-[var(--parchment)] bg-[var(--parchment)] text-var(--ink) flex flex-col items-center justify-center relative">
+                            <div class="absolute top-1 text-[10px] text-[var(--star-brown)] font-black">★</div>
+                            <div class="text-3xl font-black">13</div>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-lg text-blue-300 mb-2">위대한 소수 (Prime)</h4>
+                            <p class="text-xs opacity-80 leading-relaxed">10 이상의 소수는 약수가 없으므로 일반적인 소환이 불가능합니다. 오직 <span class="text-purple-400 font-bold">'소수 소환'</span> 마법을 통해서만 덱에서 강림합니다.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section>
+                <h3 class="text-2xl font-bold border-b border-[var(--parchment)] pb-2 mb-6 text-yellow-500">위계 (몬스터 등급)</h3>
+                <div class="grid grid-cols-1 gap-4">
+                    <div class="border border-slate-700 bg-black/50 p-4 flex gap-6 items-center">
+                        <div class="text-2xl text-[var(--star-brown)] font-black w-12 text-center">★</div>
+                        <div>
+                            <h4 class="font-bold text-sm text-yellow-500 mb-1">1성 몬스터 (2 ~ 9)</h4>
+                            <p class="text-xs opacity-80">전장의 빈 슬롯에 <span class="font-bold text-white">AP 1을 소모</span>하여 즉시 소환합니다.</p>
+                        </div>
+                    </div>
+                    <div class="border border-slate-700 bg-black/50 p-4 flex gap-6 items-center">
+                        <div class="text-2xl text-[var(--star-brown)] font-black w-12 text-center">★★</div>
+                        <div>
+                            <h4 class="font-bold text-sm text-yellow-500 mb-1">2성 몬스터 (10 ~ 29)</h4>
+                            <p class="text-xs opacity-80">해당 숫자의 <span class="font-bold text-white">약수 1개</span>를 필드에서 희생하여 소환합니다. <span class="text-green-400">AP 소모가 없습니다.</span></p>
+                        </div>
+                    </div>
+                    <div class="border border-slate-700 bg-black/50 p-4 flex gap-6 items-center">
+                        <div class="text-2xl text-[var(--star-brown)] font-black w-12 text-center">★★★</div>
+                        <div>
+                            <h4 class="font-bold text-sm text-yellow-500 mb-1">3성 몬스터 (30 ~ 100)</h4>
+                            <p class="text-xs opacity-80">해당 숫자의 <span class="font-bold text-white">약수 2개</span>를 필드에서 희생하여 소환합니다. <span class="text-green-400">AP 소모가 없습니다.</span></p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- 로컬 게임 스테이지 선택 -->
+    <div id="stage-screen" class="screen flex-col items-center p-6 overflow-y-auto z-10">
+        <button onclick="showScreen('home-screen')" class="absolute top-6 left-6 text-[var(--parchment)] hover:opacity-50 transition-all font-bold">
+            [ 되돌아가기 ]
+        </button>
+        <h2 class="text-4xl font-bold mt-16 mb-12 tracking-widest uppercase">제물을 고르게</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
+            <div onclick="initGameFlow(1)" class="group border border-[var(--parchment)] p-8 cursor-pointer hover:bg-[var(--parchment)] hover:text-black transition-all">
+                <span class="text-xs block mb-2 opacity-50 font-bold uppercase">심연의 문턱</span>
+                <h3 class="text-3xl font-bold mb-4">눈먼 들개 (1-20)</h3>
+                <p class="text-sm opacity-60 group-hover:opacity-80">이성을 잃은 가련한 짐승.</p>
+            </div>
+            <div onclick="initGameFlow(2)" class="group border border-red-900 p-8 cursor-pointer hover:bg-red-900 hover:text-white transition-all">
+                <span class="text-xs block mb-2 opacity-50 font-bold uppercase">심연의 끝</span>
+                <h3 class="text-3xl font-bold mb-4">숫자의 폭군 (1-100)</h3>
+                <p class="text-sm opacity-60">모든 마법과 수의 지배자.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="dice-screen" class="screen flex-col items-center justify-center z-[60] bg-black/95">
+        <h2 class="text-3xl font-bold mb-12 tracking-widest uppercase">운명의 주사위</h2>
+        <div class="flex gap-12 mb-12">
+            <div class="flex flex-col items-center gap-4">
+                <span class="text-xs opacity-50 uppercase">당신</span>
+                <div id="player-dice" class="w-24 h-24 border-2 border-[var(--parchment)] flex items-center justify-center text-4xl bg-black dice-anim">?</div>
+            </div>
+            <div class="flex flex-col items-center gap-4">
+                <span class="text-xs opacity-50 uppercase">상대</span>
+                <div id="ai-dice" class="w-24 h-24 border-2 border-[var(--parchment)] flex items-center justify-center text-4xl bg-black dice-anim">?</div>
+            </div>
+        </div>
+        <p id="dice-result" class="text-xl italic opacity-0 transition-opacity duration-500">운명이 결정되었네...</p>
+    </div>
+
+    <div id="game-screen" class="screen flex-col relative z-10 overflow-hidden h-screen">
+        
+        <div id="narrator-box" class="absolute top-[35%] left-4 md:left-8 w-60 md:w-80 bg-black/95 border-2 border-purple-900 p-4 flex flex-col items-start gap-2 z-[150] shadow-[0_0_20px_rgba(168,85,247,0.5)] transition-all hidden">
+            <div class="flex items-center gap-2 border-b border-purple-800 w-full pb-1">
+                <div class="text-2xl animate-bounce">🧿</div>
+                <h4 class="font-bold text-[10px] text-purple-400 uppercase tracking-widest">안내자</h4>
+            </div>
+            <p id="narrator-text" class="text-[11px] text-white leading-relaxed break-keep w-full"></p>
+        </div>
+
+        <div class="w-full flex justify-between items-center px-4 py-2 shrink-0 z-30 relative">
+            <div id="current-turn-label" class="text-lg md:text-xl font-black tracking-widest text-[var(--parchment)]">자네의 턴</div>
+            <div id="turn-count" class="text-xs opacity-50 uppercase font-bold tracking-widest">턴 01</div>
+        </div>
+
+        <div class="hidden md:flex flex-col w-56 border-2 border-[var(--parchment)] bg-black/95 p-4 shadow-2xl absolute left-4 top-14 z-40 rounded-sm">
+            <h3 class="text-sm font-bold uppercase tracking-widest border-b border-[var(--parchment)] pb-2 mb-3 text-center text-white">관측된 수</h3>
+            <div id="card-info-panel" class="flex flex-col items-center text-center w-full info-fade-in">
+                <div class="opacity-40 text-4xl mb-3 mt-6">👁️</div>
+                <p class="text-xs opacity-80 italic text-[var(--parchment)]">전장의 카드나 손패에<br>마우스를 올리게나.</p>
+            </div>
+        </div>
+
+        <div id="battle-log" class="hidden lg:flex absolute right-4 top-14 w-40 text-[9px] flex-col-reverse gap-1.5 opacity-60 pointer-events-none z-40"></div>
+
+        <div class="flex-grow flex flex-col items-center justify-center w-full min-h-0 z-10 relative px-2">
+            <div class="flex flex-col items-center mb-2 shrink-0">
+                <div id="ai-avatar-container" class="w-16 h-16 border-2 border-red-900 bg-black flex items-center justify-center text-3xl transition-all shadow-[0_0_15px_rgba(200,0,0,0.2)] relative z-20">
+                    <span id="ai-avatar">🐺</span>
+                </div>
+                <div class="mt-1.5 flex flex-col items-center w-full">
+                    <h3 id="ai-name" class="font-bold text-[10px] uppercase tracking-widest text-red-500 mb-0.5">적 본체</h3>
+                    <div class="w-36 h-1.5 bg-black border border-red-900/50">
+                        <div id="ai-hp-bar" class="hp-segment bg-red-700" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="ai-field" class="flex gap-3 md:gap-5 h-24 md:h-32 shrink-0">
+                <div class="slot w-[72px] md:w-24 h-full rounded-sm transition-all" data-index="0"></div>
+                <div class="slot w-[72px] md:w-24 h-full rounded-sm transition-all" data-index="1"></div>
+                <div class="slot w-[72px] md:w-24 h-full rounded-sm transition-all" data-index="2"></div>
+            </div>
+
+            <div class="w-full max-w-lg flex items-center gap-4 px-2 my-3 shrink-0">
+                <div class="flex-grow h-[1px] bg-[var(--parchment)] opacity-20"></div>
+                <div id="base-number-container" class="base-number-display px-6 py-1 flex flex-col items-center justify-center rounded-sm">
+                    <span class="text-[8px] uppercase tracking-widest opacity-60">중심수 (Base)</span>
+                    <span id="base-number" class="text-3xl md:text-4xl font-black text-yellow-500 leading-none">7</span>
+                </div>
+                <div class="flex-grow h-[1px] bg-[var(--parchment)] opacity-20"></div>
+            </div>
+
+            <div id="player-field" class="flex gap-3 md:gap-5 h-24 md:h-32 shrink-0">
+                <div class="slot w-[72px] md:w-24 h-full rounded-sm transition-all" data-index="0"></div>
+                <div class="slot w-[72px] md:w-24 h-full rounded-sm transition-all" data-index="1"></div>
+                <div class="slot w-[72px] md:w-24 h-full rounded-sm transition-all" data-index="2"></div>
+            </div>
+        </div>
+
+        <div class="w-full shrink-0 border-t border-[var(--parchment)]/30 bg-[#0a0a0a]/90 pt-2 pb-1 z-30 relative backdrop-blur-sm">
+            <div class="flex justify-between items-end mb-1 max-w-5xl mx-auto px-4">
+                <div class="flex flex-col gap-1.5">
+                    <div class="flex gap-4 items-center">
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-[10px] uppercase font-bold opacity-60">AP</span>
+                            <div id="ap-container" class="flex gap-1">
+                                <div class="action-point"></div><div class="action-point"></div><div class="action-point"></div>
+                            </div>
+                        </div>
+                        <div class="h-3 w-px bg-[var(--parchment)] opacity-30"></div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-[10px] uppercase font-bold opacity-60">일반소환</span>
+                            <div id="summon-status" class="text-[10px] text-green-500 font-bold uppercase">가능</div>
+                        </div>
+                    </div>
+                    <div class="flex flex-col">
+                        <div class="flex justify-between w-48 mb-0.5">
+                            <span class="text-[10px] uppercase font-bold opacity-60">나의 영혼</span>
+                            <span id="hand-count-label" class="text-[9px] uppercase font-bold opacity-60">패 3/6</span>
+                        </div>
+                        <div class="w-48 h-1.5 bg-black border border-[var(--parchment)]/30">
+                            <div id="player-hp-bar" class="hp-segment bg-white" style="width: 100%"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex flex-wrap gap-1.5 justify-end">
+                    <button onclick="drawAction()" id="btn-draw" class="px-2.5 py-1 border border-[var(--parchment)] hover:bg-[var(--parchment)] hover:text-black text-[9px] md:text-[10px] font-bold uppercase transition-all">
+                        뽑기 (-1)
+                    </button>
+                    <button onclick="discardAction()" id="btn-discard" class="px-2.5 py-1 border border-[var(--parchment)] hover:bg-red-900 hover:text-white hover:border-red-900 text-[9px] md:text-[10px] font-bold uppercase transition-all">
+                        버리기 (-1)
+                    </button>
+                    <button onclick="endTurn()" id="btn-end-turn" class="px-5 py-1 bg-[var(--parchment)] text-black text-[10px] font-bold uppercase transition-all hover:bg-white ml-1">
+                        턴 종료
+                    </button>
+                </div>
+            </div>
+
+            <div id="card-hand" class="flex justify-start md:justify-center gap-2 h-20 md:h-24 overflow-x-auto hide-scrollbar py-1 px-4 max-w-5xl mx-auto snap-x items-center"></div>
+            <div id="game-status" class="text-center w-full mt-1 pb-1 text-[10px] opacity-70 italic text-yellow-500">
+                카드를 드래그하거나 선택 후 빈 곳을 눌러 배치하게.
+            </div>
+        </div>
+
+        <div id="effect-layer" class="fixed inset-0 pointer-events-none z-50 flex items-center justify-center"></div>
+    </div>
+
+    <div id="result-modal" class="fixed inset-0 hidden items-center justify-center z-[100] p-6 bg-black/90 backdrop-blur-sm">
+        <div class="border-2 border-[var(--parchment)] bg-[#0a0a0a] p-10 max-w-sm w-full text-center shadow-[0_0_30px_rgba(212,180,131,0.2)]">
+            <div id="result-icon" class="text-6xl mb-6">💀</div>
+            <h2 id="result-title" class="text-3xl font-black mb-3 uppercase tracking-widest">결과</h2>
+            <p id="result-desc" class="text-xs opacity-60 mb-8 leading-relaxed">...</p>
+            <div class="flex flex-col gap-3">
+                <button onclick="showScreen('stage-screen')" class="py-3 border border-[var(--parchment)] hover:bg-[var(--parchment)] hover:text-black text-sm font-bold uppercase transition-all">다시 시도</button>
+                <button onclick="showScreen('home-screen')" class="py-1 text-[10px] opacity-30 hover:opacity-100 transition-all">메인 화면으로</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // ==========================================
+        // Firebase 설정 및 초기화
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyCgc9UzgjBvXxiR-6dN5OZE5haGv8bmV3k",
+            authDomain: "hakmin-battle.firebaseapp.com",
+            databaseURL: "https://hakmin-battle-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "hakmin-battle",
+            storageBucket: "hakmin-battle.firebasestorage.app",
+            messagingSenderId: "1024696874115",
+            appId: "1:1024696874115:web:d0f9ec752bfde6b6f017b6"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        // ==========================================
+
+        const MAGIC_TYPES = [
+            { id: 'M1', name: '최소공배수 소환', desc: '내 몬스터를 중심수와의 최소공배수로 변신. (소환제한 무시)' },
+            { id: 'M2', name: '최대공약수 함정', desc: '적 몬스터를 중심수와의 최대공약수로 약화. (소수 불가)' },
+            { id: 'M3', name: '소수 소환', desc: '내 덱에 있는 10 이상의 소수를 1장 제물 없이 소환.' },
+            { id: 'M4', name: '약수 마법', desc: '내 몬스터를 약수/배수로 가지는 적 몬스터 약화.' },
+            { id: 'M5', name: '배수 마법', desc: '내 몬스터 숫자를 2~4배 강화.' },
+            { id: 'M6', name: '배수 공격', desc: '내 몬스터의 배수인 적 몬스터 즉시 파괴.' },
+            { id: 'M7', name: '약수 침투', desc: '내 몬스터의 약수인 적 몬스터와 동반 파괴.' }
+        ];
+
+        let state = {
+            screen: 'home', difficulty: 1, turnCount: 1,
+            playerHP: 50, playerMaxHP: 50, aiHP: 50, aiMaxHP: 50,
+            playerHand: [], aiHand: [], playerDeck: [], aiDeck: [],
+            playerField: [null, null, null], aiField: [null, null, null],
+            playerAP: 3, hasSummoned: false, baseNumber: 7,
+            isPlayerTurn: true, isProcessing: false,
+            selectedHandIdx: null, selectedFieldIdx: null, draggedHandIdx: null,
+            activeMagicSourceIdx: null,
+            isTutorial: false, tutStep: 0,
+            difficultyConfigs: {
+                1: { name: '눈먼 들개', range: 20, hp: 40, avatar: '🐺' },
+                2: { name: '숫자의 폭군', range: 100, hp: 50, avatar: '👁️' },
+                'pvp': { name: '도전자', range: 60, hp: 50, avatar: '👤' },
+                99: { name: '허수아비', range: 10, hp: 10, avatar: '🌾' } 
+            }
+        };
+
+        // --- PVP 파이어베이스 연동 상태 관리 ---
+        let myProfile = { name: '이름없음', icon: '🐺' };
+        let currentRoomId = null;
+        let currentRoomData = null;
+        let isHost = false;
+
+        function openProfileModal() {
+            document.getElementById('profile-modal').classList.remove('hidden');
+            document.getElementById('profile-modal').classList.add('flex');
+            document.getElementById('player-name-input').value = myProfile.name !== '이름없음' ? myProfile.name : '';
+            document.getElementById('player-name-input').focus();
+        }
+
+        function closeProfileModal() {
+            document.getElementById('profile-modal').classList.add('hidden');
+            document.getElementById('profile-modal').classList.remove('flex');
+        }
+
+        function selectIcon(btn, icon) {
+            document.querySelectorAll('.icon-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            myProfile.icon = icon;
+        }
+
+        function enterPvpLobby() {
+            const nameInput = document.getElementById('player-name-input').value.trim();
+            if(!nameInput) { alert("영혼의 이름을 비워둘 수 없네."); return; }
+            
+            myProfile.name = nameInput;
+            closeProfileModal();
+            
+            document.getElementById('lobby-player-name').innerText = myProfile.name;
+            document.getElementById('lobby-player-icon').innerText = myProfile.icon;
+            
+            showScreen('pvp-lobby-screen');
+            listenToRooms();
+        }
+
+        function exitLobby() {
+            db.ref('rooms').off();
+            showScreen('home-screen');
+        }
+
+        function openCreateRoomModal() {
+            document.getElementById('create-room-modal').classList.remove('hidden');
+            document.getElementById('create-room-modal').classList.add('flex');
+            document.getElementById('room-name-input').focus();
+        }
+
+        function closeCreateRoomModal() {
+            document.getElementById('create-room-modal').classList.add('hidden');
+            document.getElementById('create-room-modal').classList.remove('flex');
+        }
+
+        // 파이어베이스에 방 생성 (호스트)
+        function createPvpRoom() {
+            const roomName = document.getElementById('room-name-input').value.trim();
+            if(!roomName) { alert("전장의 이름을 부여하게나."); return; }
+
+            const newRoomRef = db.ref('rooms').push();
+            currentRoomId = newRoomRef.key;
+            isHost = true;
+
+            const roomData = {
+                name: roomName,
+                host: { name: myProfile.name, icon: myProfile.icon, isReady: false },
+                challenger: null,
+                status: 'waiting',
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            };
+
+            newRoomRef.set(roomData);
+            newRoomRef.onDisconnect().remove();
+
+            closeCreateRoomModal();
+            showScreen('pvp-waiting-screen');
+            listenToCurrentRoom();
+        }
+
+        // 실시간 방 목록 수신
+        function listenToRooms() {
+            db.ref('rooms').on('value', snap => {
+                const data = snap.val() || {};
+                const roomsList = Object.keys(data)
+                    .map(key => ({ id: key, ...data[key] }))
+                    .filter(r => r.status === 'waiting');
+                
+                if (document.getElementById('pvp-lobby-screen').classList.contains('active')) {
+                    renderRoomList(roomsList);
+                }
+            });
+        }
+
+        function renderRoomList(rooms) {
+            const container = document.getElementById('room-list');
+            container.innerHTML = '';
+            
+            if(rooms.length === 0) {
+                container.innerHTML = `
+                    <div class="flex-grow flex flex-col items-center justify-center opacity-30 py-16 border-2 border-dashed border-[var(--parchment)]/30">
+                        <span class="text-4xl mb-4">💀</span>
+                        <p class="text-xs uppercase tracking-widest font-bold">참여할 수 있는 전장이 없네.</p>
+                    </div>
+                `;
+                document.getElementById('room-count').innerText = "0 ACTIVE";
+                return;
+            }
+
+            document.getElementById('room-count').innerText = `${rooms.length} ACTIVE`;
+            
+            rooms.forEach(room => {
+                const playerCount = room.challenger ? 2 : 1;
+                const roomIdShort = room.id.substring(room.id.length - 4);
+                const el = document.createElement('div');
+                el.className = 'room-item p-4 flex justify-between items-center rounded-sm';
+                el.innerHTML = `
+                    <div class="flex flex-col gap-1.5">
+                        <span class="text-[9px] text-red-500 font-bold uppercase tracking-widest">CONTRACT #${roomIdShort}</span>
+                        <span class="text-lg font-black text-[var(--parchment)]">${room.name}</span>
+                        <div class="flex items-center gap-2 mt-1">
+                            <span class="text-xs opacity-70 border border-white/20 bg-white/5 px-1.5 py-0.5 rounded-sm flex gap-1 items-center">
+                                <span>${room.host.icon}</span> <span>${room.host.name}</span>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-5">
+                        <div class="flex flex-col items-end">
+                            <span class="text-sm font-mono font-bold text-white">${playerCount}/2</span>
+                            <span class="text-[8px] opacity-40 uppercase font-bold tracking-widest">수용인원</span>
+                        </div>
+                        <button onclick="joinPvpRoom('${room.id}')" ${playerCount === 2 ? 'disabled' : ''} class="px-5 py-2.5 bg-red-900 text-[10px] font-bold uppercase tracking-widest text-white hover:bg-red-700 transition-all shadow-[0_0_10px_rgba(153,27,27,0.5)] ${playerCount === 2 ? 'opacity-30 cursor-not-allowed' : ''}">
+                            ${playerCount === 2 ? '만원' : '난입'}
+                        </button>
+                    </div>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        // 파이어베이스 방에 접속 (도전자)
+        function joinPvpRoom(roomId) {
+            const roomRef = db.ref('rooms/' + roomId);
+            roomRef.once('value', snap => {
+                const room = snap.val();
+                if(!room || room.challenger || room.status !== 'waiting') {
+                    return alert("입장할 수 없는 전장입니다.");
+                }
+                
+                roomRef.update({
+                    challenger: { name: myProfile.name, icon: myProfile.icon, isReady: false }
+                });
+                roomRef.child('challenger').onDisconnect().remove();
+
+                currentRoomId = roomId;
+                isHost = false;
+                
+                showScreen('pvp-waiting-screen');
+                listenToCurrentRoom();
+            });
+        }
+
+        function leaveWaitingRoom() {
+            if(!currentRoomId) return;
+            const roomRef = db.ref('rooms/' + currentRoomId);
+            
+            if(isHost) roomRef.remove();
+            else roomRef.child('challenger').remove();
+            
+            roomRef.off(); 
+            currentRoomId = null;
+            currentRoomData = null;
+            
+            showScreen('pvp-lobby-screen');
+            listenToRooms();
+        }
+
+        function kickChallenger() {
+            if(!isHost || !currentRoomId) return;
+            db.ref('rooms/' + currentRoomId + '/challenger').remove();
+        }
+
+        function toggleReady() {
+            if(!currentRoomId || !currentRoomData) return;
+            const targetNode = isHost ? 'host' : 'challenger';
+            const currentReady = isHost ? currentRoomData.host.isReady : (currentRoomData.challenger ? currentRoomData.challenger.isReady : false);
+            
+            db.ref('rooms/' + currentRoomId + '/' + targetNode).update({ isReady: !currentReady });
+        }
+
+        // 실시간 대기실 데이터 수신
+        function listenToCurrentRoom() {
+            db.ref('rooms/' + currentRoomId).on('value', snap => {
+                const data = snap.val();
+                
+                if(!data) {
+                    if(currentRoomId) {
+                        alert("전장이 소멸되었습니다.");
+                        currentRoomId = null;
+                        currentRoomData = null;
+                        showScreen('pvp-lobby-screen');
+                    }
+                    return;
+                }
+                
+                if(!isHost && !data.challenger && data.status === 'waiting') {
+                    alert("전장에서 추방당했습니다.");
+                    db.ref('rooms/' + currentRoomId).off();
+                    currentRoomId = null;
+                    currentRoomData = null;
+                    showScreen('pvp-lobby-screen');
+                    return;
+                }
+
+                currentRoomData = data;
+
+                if(data.status === 'waiting') {
+                    renderWaitingRoom();
+                } else if(data.status === 'playing') {
+                    if(document.getElementById('pvp-waiting-screen').classList.contains('active')) {
+                        alert("전장이 개방되었습니다! 주사위를 굴립니다.");
+                        initGameFlow('pvp'); 
+                    }
+                }
+            });
+        }
+
+        function renderWaitingRoom() {
+            if(!currentRoomData) return;
+            
+            document.getElementById('waiting-room-title').innerText = currentRoomData.name;
+
+            document.getElementById('wait-host-icon').innerText = currentRoomData.host.icon;
+            document.getElementById('wait-host-name').innerText = currentRoomData.host.name;
+            const hStatus = document.getElementById('wait-host-status');
+            if(currentRoomData.host.isReady) {
+                hStatus.innerText = "준비 완료!";
+                hStatus.className = "mt-4 text-sm font-bold text-emerald-500 uppercase tracking-widest bg-emerald-900/30 px-4 py-1 border border-emerald-500/50";
+            } else {
+                hStatus.innerText = "준비 중...";
+                hStatus.className = "mt-4 text-sm font-bold text-gray-500 uppercase tracking-widest bg-black px-4 py-1 border border-white/10";
+            }
+
+            const cContent = document.getElementById('wait-challenger-content');
+            const cEmpty = document.getElementById('wait-challenger-empty');
+            const btnKick = document.getElementById('btn-kick');
+            const btnTestJoin = document.getElementById('btn-test-join');
+
+            if(currentRoomData.challenger) {
+                cEmpty.classList.add('hidden');
+                cContent.classList.remove('hidden');
+                document.getElementById('wait-challenger-icon').innerText = currentRoomData.challenger.icon;
+                document.getElementById('wait-challenger-name').innerText = currentRoomData.challenger.name;
+                
+                const cStatus = document.getElementById('wait-challenger-status');
+                if(currentRoomData.challenger.isReady) {
+                    cStatus.innerText = "준비 완료!";
+                    cStatus.className = "mt-4 text-sm font-bold text-emerald-500 uppercase tracking-widest bg-emerald-900/30 px-4 py-1 border border-emerald-500/50";
+                } else {
+                    cStatus.innerText = "준비 중...";
+                    cStatus.className = "mt-4 text-sm font-bold text-gray-500 uppercase tracking-widest bg-black px-4 py-1 border border-white/10";
+                }
+
+                if(isHost) btnKick.classList.remove('hidden');
+                else btnKick.classList.add('hidden');
+            } else {
+                cContent.classList.add('hidden');
+                cEmpty.classList.remove('hidden');
+                if(isHost) btnTestJoin.classList.remove('hidden');
+                else btnTestJoin.classList.add('hidden');
+            }
+
+            const btnReady = document.getElementById('btn-ready');
+            const btnStart = document.getElementById('btn-start');
+
+            const amIReady = isHost ? currentRoomData.host.isReady : (currentRoomData.challenger ? currentRoomData.challenger.isReady : false);
+
+            if(amIReady) {
+                btnReady.innerText = "준비 해제 (Cancel)";
+                btnReady.className = "flex-1 py-4 border-2 border-yellow-600 bg-yellow-900/30 text-yellow-500 hover:bg-yellow-600 hover:text-white transition-all font-bold text-xl uppercase tracking-widest";
+            } else {
+                btnReady.innerText = "준비 (Ready)";
+                btnReady.className = "flex-1 py-4 border-2 border-emerald-600 bg-emerald-900/30 text-emerald-400 hover:bg-emerald-600 hover:text-white transition-all font-bold text-xl uppercase tracking-widest";
+            }
+
+            if(isHost) {
+                btnStart.classList.remove('hidden');
+                const canStart = currentRoomData.challenger && currentRoomData.host.isReady && currentRoomData.challenger.isReady;
+                if(canStart) {
+                    btnStart.disabled = false;
+                    btnStart.className = "flex-1 py-4 border-2 border-red-600 bg-red-900/80 text-white hover:bg-red-600 transition-all font-bold text-xl uppercase tracking-widest shadow-[0_0_15px_rgba(220,38,38,0.6)]";
+                } else {
+                    btnStart.disabled = true;
+                    btnStart.className = "flex-1 py-4 border-2 border-red-900 bg-red-950/50 text-red-500 font-bold text-xl uppercase tracking-widest opacity-50 cursor-not-allowed transition-all";
+                }
+            } else {
+                btnStart.classList.add('hidden'); 
+            }
+        }
+
+        // 테스트용: 가상 도전자 난입
+        function mockChallengerJoin() {
+            if(!currentRoomId || !isHost) return;
+            const roomRef = db.ref('rooms/' + currentRoomId);
+            roomRef.update({
+                challenger: { name: '어둠의 기사', icon: '🦇', isReady: true }
+            });
+        }
+
+        function startPvpMatch() {
+            if(!isHost || !currentRoomId) return;
+            const canStart = currentRoomData.challenger && currentRoomData.host.isReady && currentRoomData.challenger.isReady;
+            if(canStart) {
+                db.ref('rooms/' + currentRoomId).update({ status: 'playing' });
+            }
+        }
+        // --- PVP 시스템 로직 끝 ---
+
+
+        // ==========================================
+        // 기존 로컬 게임 로직 
+        // ==========================================
+
+        function showNarrator(text) {
+            const box = document.getElementById('narrator-box');
+            document.getElementById('narrator-text').innerText = text;
+            box.classList.remove('hidden');
+        }
+
+        function hideNarrator() {
+            document.getElementById('narrator-box').classList.add('hidden');
+        }
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+            const modal = document.getElementById('result-modal');
+            if(modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+            hideNarrator();
+        }
+
+        function startTutorialMatch() {
+            state.isTutorial = true;
+            state.tutStep = 0;
+            state.difficulty = 99; 
+            state.playerHP = 50; state.aiHP = 10; state.aiMaxHP = 10;
+            
+            state.playerHand = [
+                { type: 'monster', num: 3, stars: 1, ready: false, isPrime: false },
+                { type: 'monster', num: 6, stars: 2, ready: false, isPrime: false },
+                { type: 'magic', ...MAGIC_TYPES.find(m => m.id === 'M3') }
+            ];
+            state.playerDeck = [ { type: 'monster', num: 13, stars: 1, ready: false, isPrime: true } ];
+            state.aiHand = []; state.aiDeck = [];
+            state.playerField = [null, null, null];
+            state.aiField = [{ type: 'monster', num: 2, stars: 1, ready: true, isPrime: false }, null, null];
+            
+            state.playerAP = 3; state.hasSummoned = false;
+            state.selectedHandIdx = null; state.selectedFieldIdx = null; state.draggedHandIdx = null; state.activeMagicSourceIdx = null;
+            
+            document.getElementById('ai-name').innerText = state.difficultyConfigs[99].name;
+            document.getElementById('ai-avatar').innerText = state.difficultyConfigs[99].avatar;
+            state.baseNumber = 5;
+            document.getElementById('base-number').innerText = state.baseNumber;
+            state.isPlayerTurn = true;
+            
+            updateInfoPanel(null); 
+            updateUI(); 
+            showScreen('game-screen');
+            
+            showNarrator("자네, 이 심연에 처음 온 모양이군.\n먼저 손패의 '3'(1성) 카드를 클릭하거나 드래그해 빈 슬롯에 소환해보게나. (일반소환은 AP 1 소모)");
+        }
+
+        async function initGameFlow(diff) {
+            state.isTutorial = false;
+            state.difficulty = diff; showScreen('dice-screen');
+            await sleep(1000);
+            
+            // PVP일 때도 동일하게 주사위 굴림을 연출합니다.
+            const pDice = Math.floor(Math.random()*6)+1, aDice = Math.floor(Math.random()*6)+1;
+            document.getElementById('player-dice').innerText = pDice;
+            document.getElementById('ai-dice').innerText = aDice;
+            document.getElementById('dice-result').style.opacity = '1';
+            document.getElementById('dice-result').innerText = pDice >= aDice ? "자네가 먼저 시작하게." : "운명이 적을 선택했군.";
+            state.isPlayerTurn = pDice >= aDice;
+            await sleep(2000); startGame();
+        }
+
+        function startGame() {
+            const config = state.difficultyConfigs[state.difficulty];
+            state.playerHP = 50; state.aiHP = config.hp; state.aiMaxHP = config.hp;
+            state.playerHand = []; state.aiHand = []; state.playerDeck = []; state.aiDeck = [];
+            state.playerField = [null,null,null]; state.aiField = [null,null,null];
+            state.playerAP = 3; state.hasSummoned = false;
+            state.selectedHandIdx = null; state.selectedFieldIdx = null; state.draggedHandIdx = null;
+            state.activeMagicSourceIdx = null;
+            
+            for(let i=0; i<40; i++) {
+                state.playerDeck.push(generateCard(config.range));
+                state.aiDeck.push(generateCard(config.range));
+            }
+            for(let i=0; i<3; i++) {
+                state.playerHand.push(state.playerDeck.shift());
+                state.aiHand.push(state.aiDeck.shift());
+            }
+            
+            if (state.difficulty === 'pvp' && currentRoomData) {
+                const enemy = isHost ? currentRoomData.challenger : currentRoomData.host;
+                document.getElementById('ai-name').innerText = enemy.name;
+                document.getElementById('ai-avatar').innerText = enemy.icon;
+            } else {
+                document.getElementById('ai-name').innerText = config.name;
+                document.getElementById('ai-avatar').innerText = config.avatar;
+            }
+            
+            updateInfoPanel(null); 
+            
+            updateBaseNumber(); updateUI(); showScreen('game-screen');
+            if (!state.isPlayerTurn) startAITurn();
+        }
+
+        function generateCard(range) {
+            const rand = Math.random();
+            if (rand < 0.10) {
+                return { type: 'magic', ...MAGIC_TYPES[Math.floor(Math.random() * MAGIC_TYPES.length)] };
+            } else {
+                let num;
+                if (rand < 0.13) num = 1;
+                else if (range <= 20) {
+                    if (rand < 0.63) num = Math.floor(Math.random() * 8) + 2; 
+                    else num = Math.floor(Math.random() * 11) + 10; 
+                } else {
+                    if (rand < 0.63) num = Math.floor(Math.random() * 8) + 2;
+                    else if (rand < 0.86) num = Math.floor(Math.random() * 20) + 10;
+                    else num = Math.floor(Math.random() * (range - 29)) + 30;
+                }
+                
+                let stars = 1;
+                if (num >= 30) stars = 3;
+                else if (num >= 10) stars = 2;
+
+                const isCardPrime = isPrime(num) && num >= 10;
+                if (isCardPrime) stars = 1;
+
+                return { type: 'monster', num, stars, ready: false, isPrime: isCardPrime };
+            }
+        }
+
+        function updateBaseNumber() {
+            state.baseNumber = Math.floor(Math.random() * (state.difficultyConfigs[state.difficulty].range / 2)) + 2;
+            document.getElementById('base-number').innerText = state.baseNumber;
+        }
+
+        function getDynamicTextClass(num) {
+            const len = num.toString().length;
+            if (len >= 4) return 'text-xl md:text-2xl';
+            if (len === 3) return 'text-2xl md:text-3xl';
+            return 'text-3xl md:text-4xl';
+        }
+
+        function updateInfoPanel(card, isAI = false) {
+            const panel = document.getElementById('card-info-panel');
+            if(!card) {
+                panel.innerHTML = `<div class="opacity-40 text-4xl mb-3 mt-6">👁️</div><p class="text-xs opacity-80 italic text-[var(--parchment)]">전장의 카드나 손패에<br>마우스를 올리게나.</p>`;
+                return;
+            }
+            let content = '';
+            if (card.type === 'monster') {
+                const hasBonus = gcd(card.num, state.baseNumber) > 1;
+                const power = card.num + (hasBonus ? 3 : 0);
+                const isRare = card.num === 1;
+                const starDesc = card.isPrime ? "특수: [소수 소환] 마법으로만 강림" : (card.stars === 1 ? "빈 공간 소환 (AP 1)" : (card.stars === 2 ? "약수 1개 제물 (AP 0)" : "약수 2개 제물 (AP 0)"));
+                const numClass = getDynamicTextClass(card.num);
+
+                content = `
+                    <div class="w-20 h-28 mx-auto border-2 ${isAI ? 'border-red-900 bg-red-950/30 text-[var(--parchment)]' : (isRare ? 'border-cyan-400 bg-cyan-950 text-cyan-200 shadow-[0_0_10px_rgba(34,211,238,0.4)]' : 'border-[var(--parchment)] bg-[var(--parchment)] text-var(--ink)')} flex flex-col items-center justify-center relative mb-4 shadow-md info-fade-in">
+                        <div class="absolute top-1 text-[11px] ${isAI ? 'text-red-500' : 'text-[var(--star-brown)]'} font-black tracking-tighter">${'★'.repeat(card.stars)}</div>
+                        <div class="${numClass} font-black ${hasBonus ? 'underline decoration-double' : ''}">${card.num}</div>
+                    </div>
+                    <div class="w-full text-left flex flex-col gap-2 text-xs info-fade-in text-[var(--parchment)]">
+                        <div class="bg-black p-2 border border-slate-600 rounded-sm">
+                            <p class="text-yellow-400 font-bold text-sm mb-1">공격력: ${power}</p>
+                            ${hasBonus ? '<p class="text-[10px] text-yellow-200 font-bold">공약수 보너스(+3)</p>' : ''}
+                            ${card.isPrime ? '<p class="text-[10px] text-blue-300 font-bold mt-1">※ 위대한 소수</p>' : ''}
+                            ${isRare ? '<p class="text-[10px] text-cyan-300 font-bold mt-1">※ 희귀 (단독으로 모든 제물 대체)</p>' : ''}
+                        </div>
+                        <p class="mt-1 leading-relaxed"><span class="font-bold text-white">조건:</span><br>${starDesc}</p>
+                    </div>
+                `;
+            } else {
+                content = `
+                    <div class="w-20 h-28 mx-auto border-2 border-purple-500 bg-[#2a1b38] text-[var(--parchment)] flex flex-col items-center justify-center relative mb-4 shadow-md info-fade-in">
+                        <div class="absolute top-2 text-[9px] text-purple-400 font-bold">MAGIC</div>
+                        <div class="text-xs font-black text-center px-1 break-keep leading-tight">${card.name}</div>
+                    </div>
+                    <div class="w-full text-left flex flex-col gap-2 text-xs info-fade-in text-[var(--parchment)]">
+                        <p class="text-purple-300 font-bold text-sm border-b border-purple-700 pb-1">심연의 마법</p>
+                        <p class="text-[11px] leading-relaxed text-white">${card.desc}</p>
+                    </div>
+                `;
+            }
+            panel.innerHTML = content;
+        }
+
+        function updateUI() {
+            document.getElementById('player-hp-bar').style.width = `${Math.max(0, (state.playerHP/50)*100)}%`;
+            document.getElementById('ai-hp-bar').style.width = `${Math.max(0, (state.aiHP/state.aiMaxHP)*100)}%`;
+            
+            const apCont = document.getElementById('ap-container');
+            apCont.innerHTML = '';
+            for(let i=0; i<3; i++) apCont.innerHTML += `<div class="action-point ${i < state.playerAP ? '' : 'spent'}"></div>`;
+
+            document.getElementById('summon-status').innerText = state.hasSummoned ? "소모됨" : "가능";
+            document.getElementById('summon-status').className = state.hasSummoned ? "text-[10px] text-red-500 font-bold uppercase" : "text-[10px] text-green-500 font-bold uppercase";
+            document.getElementById('hand-count-label').innerText = `패 ${state.playerHand.length}/6 (덱 ${state.playerDeck.length})`;
+            
+            document.getElementById('current-turn-label').innerText = state.isPlayerTurn ? "자네의 턴" : "상대의 턴";
+            document.getElementById('current-turn-label').className = state.isPlayerTurn ? "text-lg md:text-xl font-black tracking-widest text-[var(--parchment)]" : "text-lg md:text-xl font-black tracking-widest text-red-600";
+            document.getElementById('turn-count').innerText = `턴 ${state.turnCount.toString().padStart(2, '0')}`;
+
+            document.getElementById('btn-draw').disabled = !state.isPlayerTurn || state.playerAP <= 0 || state.playerHand.length >= 6 || state.isTutorial;
+            document.getElementById('btn-discard').disabled = !state.isPlayerTurn || state.playerAP <= 0 || state.selectedHandIdx === null || state.isTutorial;
+            document.getElementById('btn-end-turn').disabled = !state.isPlayerTurn || state.isProcessing;
+
+            renderHand();
+            renderFields();
+        }
+
+        function renderHand() {
+            const container = document.getElementById('card-hand');
+            container.innerHTML = '';
+            state.playerHand.forEach((card, idx) => {
+                const el = document.createElement('div');
+                const isSelected = state.selectedHandIdx === idx;
+                const isFreeSummon = card.type === 'monster' && card.stars >= 2;
+                
+                const isPlayable = card.type === 'magic' || (!card.isPrime && (isFreeSummon || state.playerAP > 0));
+                
+                el.draggable = state.isPlayerTurn && isPlayable && !state.isProcessing;
+                if(el.draggable) {
+                    el.ondragstart = (e) => handleDragStart(e, idx);
+                    el.ondragend = handleDragEnd;
+                }
+                el.onclick = () => selectHandCard(idx);
+                el.onmouseenter = () => updateInfoPanel(card, false);
+                el.onmouseleave = () => updateInfoPanel(null);
+
+                if(card.type === 'monster') {
+                    const isRare = card.num === 1;
+                    const numClass = card.num > 999 ? 'text-lg md:text-xl' : (card.num > 99 ? 'text-xl md:text-2xl' : 'text-2xl md:text-3xl');
+                    el.className = `card w-[56px] md:w-[64px] h-full rounded flex flex-col items-center justify-center ${el.draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} flex-shrink-0 snap-center ${isSelected ? 'card-selected' : ''} ${isRare ? 'border-cyan-400 bg-cyan-100 text-cyan-900 shadow-[0_0_10px_rgba(34,211,238,0.3)]' : ''}`;
+                    const hasBonus = gcd(card.num, state.baseNumber) > 1;
+                    el.innerHTML = `
+                        <div class="absolute top-0.5 text-[8px] text-[var(--star-brown)] font-black tracking-tighter">${'★'.repeat(card.stars)}</div>
+                        <div class="${numClass} font-black ${hasBonus ? 'underline decoration-double' : ''}">${card.num}</div>
+                    `;
+                } else {
+                    el.className = `card magic-card w-[56px] md:w-[64px] h-full rounded flex flex-col items-center justify-center ${el.draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} flex-shrink-0 snap-center ${isSelected ? 'card-selected' : ''}`;
+                    el.innerHTML = `
+                        <div class="absolute top-1 text-[7px] text-purple-400 font-bold">MAGIC</div>
+                        <div class="text-[8px] font-black text-center px-1 break-keep leading-tight">${card.name}</div>
+                    `;
+                }
+                if (!state.isPlayerTurn || !isPlayable) el.classList.add('opacity-40');
+                container.appendChild(el);
+            });
+        }
+
+        function renderFields() {
+            const pSlots = document.querySelectorAll('#player-field .slot');
+            pSlots.forEach((slot, idx) => {
+                slot.className = 'slot w-[72px] md:w-24 h-full rounded-sm transition-all';
+                slot.onclick = () => handleSlotClick('player', idx);
+                
+                slot.ondragover = (e) => {
+                    e.preventDefault();
+                    if(state.draggedHandIdx === null) return;
+                    const card = state.playerHand[state.draggedHandIdx];
+                    let valid = false;
+                    if(card.type === 'monster' && !card.isPrime) {
+                        const tgt = state.playerField[idx];
+                        if (card.stars === 1 && !tgt && !state.hasSummoned) valid = true;
+                        if (card.stars === 2 && tgt && (card.num % tgt.num === 0 || tgt.num === 1)) valid = true;
+                        if (card.stars === 3 && tgt) {
+                            if (tgt.num === 1) valid = true;
+                            else if (card.num % tgt.num === 0) {
+                                if(state.playerField.filter((c, i) => c && i !== idx && (card.num % c.num === 0 || c.num === 1)).length >= 1) valid = true;
+                            }
+                        }
+                    } else if (card.type === 'magic') {
+                        if (['M4', 'M6', 'M7'].includes(card.id)) {
+                            if (state.activeMagicSourceIdx === null && state.playerField[idx]) valid = true;
+                            else if (state.activeMagicSourceIdx !== null && state.playerField[idx]) valid = true;
+                        } else {
+                            if (card.id === 'M1' && state.playerField[idx]) valid = true;
+                            if (card.id === 'M3' && !state.playerField[idx] && !state.hasSummoned) valid = true;
+                            if (card.id === 'M5' && state.playerField[idx]) valid = true;
+                        }
+                    }
+                    if(valid) slot.classList.add('slot-valid-target');
+                    else slot.classList.add('slot-invalid-target');
+                };
+                slot.ondragleave = () => slot.classList.remove('slot-valid-target', 'slot-invalid-target');
+                slot.ondrop = (e) => { e.preventDefault(); slot.classList.remove('slot-valid-target', 'slot-invalid-target'); handleSlotClick('player', idx); };
+
+                if (state.selectedHandIdx !== null) {
+                    const card = state.playerHand[state.selectedHandIdx];
+                    let valid = false;
+                    if (card.type === 'monster' && !card.isPrime) {
+                        const tgt = state.playerField[idx];
+                        if (card.stars === 1 && !tgt && !state.hasSummoned) valid = true;
+                        if (card.stars === 2 && tgt && (card.num % tgt.num === 0 || tgt.num === 1)) valid = true;
+                        if (card.stars === 3 && tgt) {
+                            if (tgt.num === 1) valid = true;
+                            else if (card.num % tgt.num === 0) {
+                                if(state.playerField.filter((c, i) => c && i !== idx && (card.num % c.num === 0 || c.num === 1)).length >= 1) valid = true;
+                            }
+                        }
+                    } else if (card.type === 'magic') {
+                        if (['M4', 'M6', 'M7'].includes(card.id)) {
+                            if (state.activeMagicSourceIdx === null && state.playerField[idx]) valid = true;
+                            else if (state.activeMagicSourceIdx !== null && state.playerField[idx]) valid = true;
+                        } else {
+                            if (card.id === 'M1' && state.playerField[idx]) valid = true;
+                            if (card.id === 'M3' && !state.playerField[idx] && !state.hasSummoned) valid = true;
+                            if (card.id === 'M5' && state.playerField[idx]) valid = true;
+                        }
+                    }
+                    if (valid) slot.classList.add('slot-valid-target');
+                }
+
+                slot.innerHTML = '';
+                const card = state.playerField[idx];
+                if (card) {
+                    const isRare = card.num === 1;
+                    const numClass = getDynamicTextClass(card.num);
+                    const el = document.createElement('div');
+                    el.className = `card w-full h-full rounded-sm flex flex-col items-center justify-center cursor-pointer ${!card.ready ? 'summoning-sickness' : ''} ${state.selectedFieldIdx === idx ? 'card-selected' : ''} ${isRare ? 'border-cyan-400 bg-cyan-100 text-cyan-900' : ''}`;
+                    
+                    if (state.activeMagicSourceIdx === idx) {
+                        el.classList.remove('border-[var(--parchment)]', 'border-cyan-400');
+                        el.classList.add('magic-source-active');
+                    }
+
+                    el.onmouseenter = () => updateInfoPanel(card, false);
+                    el.onmouseleave = () => updateInfoPanel(null);
+                    el.innerHTML = `
+                        <div class="absolute top-1 text-[10px] text-[var(--star-brown)] font-black tracking-tighter">${'★'.repeat(card.stars)}</div>
+                        <div class="${numClass} font-black">${card.num}</div>
+                        <div class="text-[7px] uppercase mt-1 opacity-60 font-bold">${!card.ready ? '휴식중' : '공격가능'}</div>
+                    `;
+                    slot.appendChild(el);
+                }
+            });
+
+            const aSlots = document.querySelectorAll('#ai-field .slot');
+            aSlots.forEach((slot, idx) => {
+                slot.className = 'slot w-[72px] md:w-24 h-full rounded-sm transition-all';
+                slot.onclick = () => handleSlotClick('ai', idx);
+                
+                slot.ondragover = (e) => {
+                    e.preventDefault();
+                    if(state.draggedHandIdx === null) return;
+                    const card = state.playerHand[state.draggedHandIdx];
+                    let valid = false;
+                    if (card.type === 'magic' && state.aiField[idx]) {
+                        if (['M2'].includes(card.id)) valid = true;
+                        else if (['M4', 'M6', 'M7'].includes(card.id) && state.activeMagicSourceIdx !== null) {
+                            const myCard = state.playerField[state.activeMagicSourceIdx];
+                            const enemyCard = state.aiField[idx];
+                            if (card.id === 'M4' && (enemyCard.num % myCard.num === 0 || myCard.num % enemyCard.num === 0)) valid = true;
+                            if (card.id === 'M6' && enemyCard.num % myCard.num === 0) valid = true;
+                            if (card.id === 'M7' && myCard.num % enemyCard.num === 0) valid = true;
+                        }
+                    }
+                    if(valid) slot.classList.add('slot-valid-target');
+                    else slot.classList.add('slot-invalid-target');
+                };
+                slot.ondragleave = () => slot.classList.remove('slot-valid-target', 'slot-invalid-target');
+                slot.ondrop = (e) => { e.preventDefault(); slot.classList.remove('slot-valid-target', 'slot-invalid-target'); handleSlotClick('ai', idx); };
+                
+                if (state.selectedHandIdx !== null) {
+                    const card = state.playerHand[state.selectedHandIdx];
+                    let valid = false;
+                    if (card.type === 'magic' && state.aiField[idx]) {
+                        if (['M2'].includes(card.id)) valid = true;
+                        else if (['M4', 'M6', 'M7'].includes(card.id) && state.activeMagicSourceIdx !== null) {
+                            const myCard = state.playerField[state.activeMagicSourceIdx];
+                            const enemyCard = state.aiField[idx];
+                            if (card.id === 'M4' && (enemyCard.num % myCard.num === 0 || myCard.num % enemyCard.num === 0)) valid = true;
+                            if (card.id === 'M6' && enemyCard.num % myCard.num === 0) valid = true;
+                            if (card.id === 'M7' && myCard.num % enemyCard.num === 0) valid = true;
+                        }
+                    }
+                    if (valid) slot.classList.add('slot-valid-target');
+                } else if (state.selectedFieldIdx !== null && state.aiField[idx]) {
+                    slot.classList.add('slot-valid-target', 'cursor-crosshair');
+                }
+
+                slot.innerHTML = '';
+                const card = state.aiField[idx];
+                if (card) {
+                    const numClass = getDynamicTextClass(card.num);
+                    const el = document.createElement('div');
+                    el.className = `card w-full h-full rounded-sm flex flex-col items-center justify-center border-red-900 bg-red-950/20 text-[var(--parchment)] transition-colors`;
+                    el.onmouseenter = () => updateInfoPanel(card, true);
+                    el.onmouseleave = () => updateInfoPanel(null);
+                    el.innerHTML = `
+                        <div class="absolute top-1 text-[10px] tracking-tighter opacity-50">${'★'.repeat(card.stars)}</div>
+                        <div class="${numClass} font-black">${card.num}</div>
+                    `;
+                    slot.appendChild(el);
+                }
+            });
+
+            const aiAvatar = document.getElementById('ai-avatar-container');
+            const hasAnyAiCard = state.aiField.some(c => c !== null);
+            aiAvatar.onclick = null;
+            aiAvatar.classList.remove('avatar-targetable');
+            
+            if (state.selectedFieldIdx !== null && !hasAnyAiCard) {
+                aiAvatar.onclick = () => attackDirectAction(state.selectedFieldIdx);
+                aiAvatar.classList.add('avatar-targetable');
+            }
+        }
+
+        function handleSlotClick(side, idx) {
+            if (!state.isPlayerTurn || state.isProcessing) return;
+
+            if (state.selectedHandIdx !== null) {
+                state.draggedHandIdx = state.selectedHandIdx;
+                const card = state.playerHand[state.selectedHandIdx];
+                
+                if (card.type === 'magic' && ['M4', 'M6', 'M7'].includes(card.id)) {
+                    if (state.activeMagicSourceIdx === null) {
+                        if (side === 'player' && state.playerField[idx]) {
+                            state.activeMagicSourceIdx = idx;
+                            setStatus("이제 마법을 시전할 적 몬스터를 선택하게.");
+                            updateUI();
+                        } else setStatus("먼저 마법의 매개체가 될 아군 몬스터를 선택해야 하네.");
+                    } else {
+                        if (side === 'ai' && state.aiField[idx]) handleTwoTargetMagicDrop(card, state.activeMagicSourceIdx, idx);
+                        else if (side === 'player' && state.playerField[idx]) {
+                            state.activeMagicSourceIdx = idx; 
+                            setStatus("마법을 시전할 적 몬스터를 선택하게.");
+                            updateUI();
+                        } else setStatus("적 몬스터를 선택하게.");
+                    }
+                    return;
+                }
+
+                if (card.type === 'monster') handleMonsterDrop(card, side, idx);
+                else handleMagicDrop(card, side, idx);
+                return;
+            }
+
+            if (side === 'player') {
+                const card = state.playerField[idx];
+                if (!card || !card.ready) return setStatus(card ? "휴식 중인 몬스터는 움직일 수 없네." : "");
+                
+                state.selectedFieldIdx = state.selectedFieldIdx === idx ? null : idx;
+                if(state.selectedFieldIdx !== null) setStatus("공격 대상을 클릭하게.");
+                else setStatus("선택 해제됨.");
+                updateUI();
+            } else if (side === 'ai') {
+                if (state.selectedFieldIdx !== null && state.aiField[idx]) {
+                    attackAction(state.selectedFieldIdx, idx);
+                }
+            }
+        }
+
+        function handleDragStart(e, idx) {
+            const card = state.playerHand[idx];
+            const isFreeSummon = card.type === 'monster' && card.stars >= 2;
+            if (!state.isPlayerTurn || state.isProcessing || card.isPrime || (!isFreeSummon && state.playerAP <= 0)) {
+                e.preventDefault();
+                if(card.isPrime) setStatus("10 이상의 소수는 '소수 소환' 마법으로만 강림하네.");
+                else if(!isFreeSummon && state.playerAP <= 0) setStatus("AP가 부족하네.");
+                return;
+            }
+            state.draggedHandIdx = idx;
+            state.selectedHandIdx = idx;
+            state.activeMagicSourceIdx = null; 
+            e.dataTransfer.effectAllowed = 'copyMove';
+            e.dataTransfer.setData('text/plain', idx);
+            setTimeout(() => {
+                e.target.classList.add('dragging');
+                updateUI();
+                if (card.type === 'magic' && ['M4', 'M6', 'M7'].includes(card.id)) setStatus("[마법] 매개체가 될 아군 몬스터를 향해 던지게.");
+                else setStatus(card.type === 'monster' ? "소환할 자리를 선택하게." : "마법을 사용할 타겟을 선택하게.");
+            }, 0);
+        }
+
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+            state.draggedHandIdx = null;
+            updateUI();
+        }
+
+        function handleMonsterDrop(card, side, idx) {
+            if (side !== 'player') return setStatus("아군 진영에만 배치할 수 있네.");
+            if (card.isPrime) return setStatus("이 위대한 소수는 마법으로만 소환할 수 있네.");
+            
+            if (state.isTutorial) {
+                if (state.tutStep === 0 && card.num === 3 && card.stars === 1) {} 
+                else if (state.tutStep === 3 && card.stars === 2 && card.num === 6) {} 
+                else return setStatus("지금은 안내자의 지시를 따르게나.");
+            }
+
+            const targetCard = state.playerField[idx];
+
+            if (card.stars === 1) {
+                if (state.hasSummoned) return setStatus("이번 턴엔 이미 일반 소환권을 소모했네.");
+                if (targetCard) return setStatus("빈 공간에만 소환할 수 있네.");
+                if (state.playerAP <= 0) return setStatus("AP가 부족하네.");
+                
+                state.playerAP--;
+                state.playerField[idx] = { ...card, ready: false };
+                state.playerHand.splice(state.draggedHandIdx !== null ? state.draggedHandIdx : state.selectedHandIdx, 1);
+                state.draggedHandIdx = null; state.selectedHandIdx = null;
+                state.hasSummoned = true;
+                updateUI();
+                addLog(`[★1] ${card.num} 소환.`);
+
+                if (state.isTutorial && state.tutStep === 0) {
+                    state.tutStep = 1;
+                    setTimeout(() => showNarrator("좋아! 방금 소환된 몬스터는 '휴식중'이라 바로 공격할 수 없네.\n이것을 소환 후유증이라 하지. 우측 하단의 [턴 종료]를 누르게나."), 1000);
+                }
+
+            } else if (card.stars === 2) {
+                if (!targetCard) return setStatus(`제물 위에 내려놓게나.`);
+                if (targetCard.num !== 1 && card.num % targetCard.num !== 0) return setStatus(`${card.num}의 약수가 아닐세.`);
+                
+                showEffect('💀', 'player-field', idx);
+                state.playerField[idx] = { ...card, ready: false };
+                state.playerHand.splice(state.draggedHandIdx !== null ? state.draggedHandIdx : state.selectedHandIdx, 1);
+                state.draggedHandIdx = null; state.selectedHandIdx = null;
+                updateUI();
+                addLog(`[★2] 제물을 바쳐 ${card.num} 강림. (AP 유지)`);
+
+                if (state.isTutorial && state.tutStep === 3) {
+                    state.tutStep = 4;
+                    setTimeout(() => showNarrator("아주 영리해. 2성부터는 AP가 소모되지 않지.\n이번엔 마법을 써보지. 손패의 [소수 소환]을 빈 공간에 사용하게!"), 1000);
+                }
+            } else if (card.stars === 3) {
+                if (!targetCard) return setStatus(`제물 위에 내려놓게나.`);
+                
+                if (targetCard.num === 1) {
+                    showEffect('💀', 'player-field', idx);
+                    state.playerField[idx] = { ...card, ready: false };
+                    state.playerHand.splice(state.draggedHandIdx !== null ? state.draggedHandIdx : state.selectedHandIdx, 1);
+                    state.draggedHandIdx = null; state.selectedHandIdx = null;
+                    updateUI();
+                    addLog(`[★3] 희귀 제물(1)을 바쳐 ${card.num} 강림! (AP 유지)`);
+                } else {
+                    if (card.num % targetCard.num !== 0) return setStatus(`${card.num}의 약수가 아닐세.`);
+                    
+                    const secondTargetIdx = state.playerField.findIndex((c, i) => i !== idx && c && (card.num % c.num === 0 || c.num === 1));
+                    if (secondTargetIdx === -1) return setStatus(`3성 소환은 필드에 2개의 약수 제물(또는 1)이 필요하네.`);
+                    
+                    showEffect('💀', 'player-field', idx);
+                    showEffect('💀', 'player-field', secondTargetIdx);
+                    state.playerField[secondTargetIdx] = null; 
+                    state.playerField[idx] = { ...card, ready: false }; 
+                    state.playerHand.splice(state.draggedHandIdx !== null ? state.draggedHandIdx : state.selectedHandIdx, 1);
+                    state.draggedHandIdx = null; state.selectedHandIdx = null;
+                    updateUI();
+                    addLog(`[★3] 두 개의 제물을 바쳐 ${card.num} 강림! (AP 유지)`);
+                }
+            }
+        }
+
+        function handleMagicDrop(card, side, idx) {
+            if (state.playerAP <= 0) return setStatus("AP가 부족하네.");
+            let success = false;
+            
+            if (state.isTutorial) {
+                if (state.tutStep === 4 && card.id === 'M3') {} 
+                else return setStatus("지금은 안내자의 지시를 따르게나.");
+            }
+
+            if (card.id === 'M1' && side === 'player' && state.playerField[idx]) {
+                const m = state.playerField[idx];
+                const lcm = (m.num * state.baseNumber) / gcd(m.num, state.baseNumber);
+                state.playerField[idx].num = lcm; addLog(`최소공배수 소환! ${m.num} ➡️ ${lcm}`); success = true;
+            } else if (card.id === 'M2' && side === 'ai' && state.aiField[idx]) {
+                const m = state.aiField[idx];
+                if (!isPrime(m.num)) {
+                    state.aiField[idx].num = gcd(m.num, state.baseNumber);
+                    addLog(`최대공약수 함정! 적 약화됨.`); success = true;
+                } else setStatus("소수에게는 함정이 통하지 않네.");
+            } else if (card.id === 'M3' && side === 'player' && !state.playerField[idx]) {
+                if (state.hasSummoned) return setStatus("이번 턴엔 일반 소환권을 이미 소모했네.");
+                const primeIdx = state.playerDeck.findIndex(c => c.type === 'monster' && c.isPrime);
+                if (primeIdx !== -1) {
+                    const pCard = state.playerDeck.splice(primeIdx, 1)[0];
+                    state.playerField[idx] = { ...pCard, ready: false };
+                    state.hasSummoned = true; 
+                    addLog(`소수 소환! 덱에서 ${pCard.num} 강림.`); 
+                    success = true;
+
+                    if (state.isTutorial && state.tutStep === 4) {
+                        state.tutStep = 5;
+                        setTimeout(() => showNarrator("위대한 소수 13이 강림했군! 마법으로 부른 자 역시 소환 직후엔 쉴 시간이 필요하지.\n다시 한 번 우측 하단 [턴 종료]를 누르게나."), 1500);
+                    }
+                } else {
+                    return setStatus("덱에 10 이상의 소수 카드가 남아있지 않네.");
+                }
+            } else if (card.id === 'M5' && side === 'player' && state.playerField[idx]) {
+                state.playerField[idx].num *= (Math.floor(Math.random() * 3) + 2);
+                addLog(`배수 마법! 힘 증가.`); success = true;
+            } else {
+                setStatus("유효하지 않은 대상일세.");
+            }
+
+            if (success) {
+                state.playerAP--; state.playerHand.splice(state.draggedHandIdx !== null ? state.draggedHandIdx : state.selectedHandIdx, 1);
+                state.draggedHandIdx = null; state.selectedHandIdx = null; updateUI();
+            }
+        }
+
+        function handleTwoTargetMagicDrop(card, sourceIdx, targetIdx) {
+            if (state.playerAP <= 0) return setStatus("AP가 부족하네.");
+            let success = false;
+            const myCard = state.playerField[sourceIdx];
+            const enemy = state.aiField[targetIdx];
+
+            if (card.id === 'M4') {
+                if (enemy.num % myCard.num === 0 || myCard.num % enemy.num === 0) {
+                    state.aiField[targetIdx].num = Math.floor(enemy.num / myCard.num) || 1;
+                    addLog(`약수 마법! 적 약화.`); success = true;
+                } else setStatus("약수/배수 관계가 아닐세.");
+            } else if (card.id === 'M6') {
+                if (enemy.num % myCard.num === 0) {
+                    state.aiField[targetIdx] = null;
+                    showEffect('💥', 'ai-field', targetIdx);
+                    addLog("배수 공격! 적 파괴."); success = true;
+                } else setStatus(`적 카드가 ${myCard.num}의 배수가 아닐세.`);
+            } else if (card.id === 'M7') {
+                if (myCard.num % enemy.num === 0) {
+                    state.aiField[targetIdx] = null; state.playerField[sourceIdx] = null;
+                    showEffect('🗡️', 'ai-field', targetIdx);
+                    addLog("약수 침투! 동반 파괴."); success = true;
+                } else setStatus(`적 카드가 ${myCard.num}의 약수가 아닐세.`);
+            }
+
+            if (success) {
+                state.playerAP--; 
+                state.playerHand.splice(state.selectedHandIdx, 1);
+                state.selectedHandIdx = null; 
+                state.activeMagicSourceIdx = null;
+                state.draggedHandIdx = null;
+                updateUI();
+            }
+        }
+
+        function selectHandCard(idx) {
+            state.selectedHandIdx = state.selectedHandIdx === idx ? null : idx;
+            state.activeMagicSourceIdx = null; 
+            if(state.selectedHandIdx !== null) {
+                const c = state.playerHand[idx];
+                if(c.isPrime) setStatus("10 이상의 소수는 '소수 소환' 마법으로만 강림할 수 있네.");
+                else if (c.type === 'magic' && ['M4', 'M6', 'M7'].includes(c.id)) setStatus("[마법] 먼저 매개체가 될 아군 몬스터를 클릭하게.");
+                else setStatus(c.type === 'monster' ? "배치할 빈 곳이나 제물 위를 클릭하게." : "타겟을 지정하게.");
+            }
+            else setStatus("선택 해제됨.");
+            updateUI();
+        }
+
+        function discardAction() {
+            if(state.isTutorial) return setStatus("튜토리얼 중에는 막혀있다네.");
+            if(!state.isPlayerTurn || state.playerAP <= 0 || state.selectedHandIdx === null) return;
+            state.playerAP--; setStatus("카드를 버렸네.");
+            state.playerHand.splice(state.selectedHandIdx, 1);
+            state.selectedHandIdx = null; state.activeMagicSourceIdx = null; updateUI();
+        }
+
+        function drawAction() {
+            if(state.isTutorial) return setStatus("튜토리얼 중에는 막혀있다네.");
+            if(!state.isPlayerTurn || state.playerAP <= 0 || state.playerHand.length >= 6) return;
+            if(state.playerDeck.length === 0) return setStatus("덱에 더 이상 카드가 없네.");
+            state.playerAP--; 
+            state.playerHand.push(state.playerDeck.shift());
+            state.activeMagicSourceIdx = null;
+            addLog("새 카드를 뽑았네."); updateUI();
+        }
+
+        async function attackAction(myIdx, enemyIdx) {
+            if (state.isTutorial) {
+                if (state.tutStep === 2) {} 
+                else return setStatus("지금은 안내자의 지시를 따르게나.");
+            }
+
+            if (state.playerAP <= 0 || state.isProcessing) return;
+            state.isProcessing = true; state.playerAP--;
+            
+            const pCard = state.playerField[myIdx];
+            const eCard = state.aiField[enemyIdx];
+            let pPower = pCard.num + (gcd(pCard.num, state.baseNumber) > 1 ? 3 : 0);
+            let ePower = eCard.num + (gcd(eCard.num, state.baseNumber) > 1 ? 3 : 0);
+            let pDie = false, eDie = false, msg = "";
+
+            if (pPower > ePower) { eDie = true; msg = "힘으로 적을 짓밟았네."; }
+            else if (ePower > pPower) { pDie = true; msg = "반격에 당해 파괴되었네."; }
+            else { pDie = true; eDie = true; msg = "서로 공멸했네."; }
+
+            if(pDie) state.playerField[myIdx] = null; else state.playerField[myIdx].ready = false;
+            if(eDie) state.aiField[enemyIdx] = null;
+
+            showEffect('⚔️', 'ai-field', enemyIdx); addLog(msg); updateUI();
+            
+            if (state.isTutorial && state.tutStep === 2) {
+                state.tutStep = 3;
+                setTimeout(() => showNarrator("훌륭해! 힘이 높은 자가 이기지.\n자, 이번엔 2성 몬스터 소환일세. 손패의 '6'을 방금 공격한 '3' 위에 겹쳐 제물로 바치게!"), 1000);
+            }
+
+            await sleep(1000);
+            state.selectedFieldIdx = null; state.isProcessing = false;
+            checkGameEnd(); updateUI();
+        }
+
+        async function attackDirectAction(myIdx) {
+            if (state.isTutorial) {
+                if (state.tutStep === 6) {} 
+                else return setStatus("지금은 안내자의 지시를 따르게나.");
+            }
+
+            if (state.playerAP <= 0 || state.isProcessing) return;
+            state.isProcessing = true; state.playerAP--;
+            
+            const pCard = state.playerField[myIdx];
+            let pPower = pCard.num + (gcd(pCard.num, state.baseNumber) > 1 ? 3 : 0);
+            state.aiHP -= pPower;
+            state.playerField[myIdx].ready = false;
+            
+            showEffect('🩸', 'ai-avatar-container', -1);
+            showDamage(pPower, 'ai-avatar-container');
+            addLog(`직접 타격! ${pPower} 피해.`); updateUI();
+            
+            if (state.isTutorial && state.tutStep === 6) {
+                state.tutStep = 7;
+                setTimeout(() => {
+                    hideNarrator();
+                    const modal = document.getElementById('result-modal');
+                    modal.classList.remove('hidden'); modal.classList.add('flex');
+                    document.getElementById('result-icon').innerText = '🎉';
+                    document.getElementById('result-title').innerText = '수습 완료';
+                    document.getElementById('result-desc').innerText = "훌륭하군! 이제 심연의 규칙을 모두 깨우쳤네.";
+                    state.isTutorial = false;
+                }, 1500);
+            }
+
+            await sleep(1000);
+            state.selectedFieldIdx = null; state.isProcessing = false;
+            checkGameEnd(); updateUI();
+        }
+
+        async function endTurn() {
+            if (state.isTutorial) {
+                if (state.tutStep === 1 || state.tutStep === 5) {} 
+                else return setStatus("아직 턴을 종료할 때가 아닐세.");
+            }
+
+            if (!state.isPlayerTurn || state.isProcessing) return;
+            state.isPlayerTurn = false; state.selectedHandIdx = null; state.selectedFieldIdx = null;
+            state.activeMagicSourceIdx = null;
+            updateUI(); await startAITurn();
+        }
+
+        async function startAITurn() {
+            if (state.isTutorial) {
+                setStatus("상대의 차례일세...");
+                await sleep(1500);
+                
+                state.turnCount++; state.isPlayerTurn = true; state.playerAP = 3; state.hasSummoned = false;
+                state.playerField.forEach(c => { if(c) c.ready = true; });
+                
+                if (state.tutStep === 1) {
+                    state.tutStep = 2;
+                    showNarrator("상대는 겁을 먹고 턴을 넘겼군.\n자네의 '3'이 이제 '공격가능'이네! '3'을 클릭하고 적의 '2'를 클릭해 파괴하게.");
+                } else if (state.tutStep === 5) {
+                    state.tutStep = 6;
+                    showNarrator("이제 적의 방어선이 비었군!\n'13'을 클릭하고, 위에 있는 붉은 적 본체(허수아비)를 탭해 직접 타격하게!");
+                }
+                
+                updateUI(); setStatus("자네의 차례일세.");
+                return;
+            }
+
+            setStatus("상대의 차례일세...");
+            await sleep(1000);
+            let aiAP = 3;
+            let aiHasSummoned = false;
+            state.aiField.forEach(c => { if(c) c.ready = true; });
+
+            while (aiAP > 0 && !checkGameEnd()) {
+                await sleep(800);
+                let actionTaken = false;
+                
+                const readyIndices = state.aiField.map((c, i) => c && c.ready ? i : -1).filter(i => i !== -1);
+                if (readyIndices.length > 0) {
+                    const hasPlayerCards = state.playerField.some(c => c !== null);
+                    if (!hasPlayerCards) {
+                        const aIdx = readyIndices[0];
+                        let aiPower = state.aiField[aIdx].num + (gcd(state.aiField[aIdx].num, state.baseNumber) > 1 ? 3 : 0);
+                        state.playerHP -= aiPower;
+                        state.aiField[aIdx].ready = false;
+                        showEffect('🩸', 'player-hp-bar', -1);
+                        showDamage(aiPower, 'player-hp-bar');
+                        addLog(`적이 타격! ${aiPower} 피해.`);
+                        aiAP--; actionTaken = true;
+                    } else {
+                        let bestAttack = null;
+                        for (let aIdx of readyIndices) {
+                            const aiCard = state.aiField[aIdx];
+                            let aiPower = aiCard.num + (gcd(aiCard.num, state.baseNumber) > 1 ? 3 : 0);
+
+                            for (let pIdx = 0; pIdx < 3; pIdx++) {
+                                const pCard = state.playerField[pIdx];
+                                if (!pCard) continue;
+                                let pPower = pCard.num + (gcd(pCard.num, state.baseNumber) > 1 ? 3 : 0);
+
+                                if (aiPower > pPower) {
+                                    if (!bestAttack || bestAttack.score < 50) bestAttack = { aIdx, pIdx, score: 50, type: 'win' };
+                                } else if (aiPower === pPower) {
+                                    if (!bestAttack || bestAttack.score < 30) bestAttack = { aIdx, pIdx, score: 30, type: 'trade' };
+                                }
+                            }
+                        }
+
+                        if (bestAttack) {
+                            const { aIdx, pIdx, type } = bestAttack;
+                            if (type === 'win') {
+                                state.playerField[pIdx] = null; state.aiField[aIdx].ready = false;
+                                addLog("적이 공격으로 아군을 파괴했네.");
+                            } else if (type === 'trade') {
+                                state.playerField[pIdx] = null; state.aiField[aIdx] = null;
+                                addLog("적과 동반 파괴되었네.");
+                            }
+                            showEffect('💥', 'player-field', pIdx);
+                            aiAP--; actionTaken = true;
+                        }
+                    }
+                }
+
+                if (!actionTaken && state.aiHand.length > 0) {
+                    let sortedHand = state.aiHand.map((c, i) => ({c, i})).filter(o => o.c.type === 'monster').sort((a,b) => {
+                        if(b.c.stars !== a.c.stars) return b.c.stars - a.c.stars;
+                        return b.c.num - a.c.num;
+                    });
+
+                    for (let item of sortedHand) {
+                        if (item.c.isPrime) {
+                            state.aiHand.splice(item.i, 1);
+                            addLog("적이 손패의 소수를 버렸네.");
+                            actionTaken = true; break;
+                        }
+
+                        if (item.c.stars === 1 && !aiHasSummoned) {
+                            const empty = state.aiField.indexOf(null);
+                            if (empty !== -1) {
+                                state.aiField[empty] = { ...item.c, ready: false };
+                                state.aiHand.splice(item.i, 1);
+                                aiAP--; aiHasSummoned = true; actionTaken = true;
+                                addLog("적이 수하를 소환했군."); break;
+                            }
+                        } else if (item.c.stars === 2) {
+                            const sacIdx = state.aiField.findIndex(f => f && (item.c.num % f.num === 0 || f.num === 1));
+                            if (sacIdx !== -1) {
+                                state.aiField[sacIdx] = { ...item.c, ready: false };
+                                state.aiHand.splice(item.i, 1);
+                                showEffect('💀', 'ai-field', sacIdx);
+                                actionTaken = true;
+                                addLog("적이 제물을 바쳐 강림시켰네."); break;
+                            }
+                        } else if (item.c.stars === 3) {
+                            const hasOneIdx = state.aiField.findIndex(f => f && f.num === 1);
+                            if (hasOneIdx !== -1) {
+                                state.aiField[hasOneIdx] = { ...item.c, ready: false };
+                                state.aiHand.splice(item.i, 1);
+                                showEffect('💀', 'ai-field', hasOneIdx);
+                                actionTaken = true;
+                                addLog("적이 희귀 제물을 바쳐 강림시켰네."); break;
+                            } else {
+                                const divisors = state.aiField.map((f, i) => f && item.c.num % f.num === 0 ? i : -1).filter(i => i !== -1);
+                                if (divisors.length >= 2) {
+                                    state.aiField[divisors[0]] = { ...item.c, ready: false };
+                                    state.aiField[divisors[1]] = null;
+                                    state.aiHand.splice(item.i, 1);
+                                    showEffect('💀', 'ai-field', divisors[0]); showEffect('💀', 'ai-field', divisors[1]);
+                                    actionTaken = true;
+                                    addLog("적이 두 개의 제물로 강림시켰네."); break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (!actionTaken && state.aiHand.length >= 6) {
+                    const discardIdx = state.aiHand.findIndex(c => c.type === 'magic' || c.isPrime);
+                    state.aiHand.splice(discardIdx !== -1 ? discardIdx : 0, 1);
+                    aiAP--; actionTaken = true;
+                    addLog("적이 손패를 버렸네.");
+                }
+
+                if (!actionTaken && state.aiDeck.length > 0 && state.aiHand.length < 6) {
+                    state.aiHand.push(state.aiDeck.shift());
+                    aiAP--; actionTaken = true;
+                    addLog("적이 카드를 뽑았네.");
+                }
+
+                if (!actionTaken) break;
+                updateUI();
+            }
+            
+            await sleep(1000);
+            state.turnCount++; state.isPlayerTurn = true; state.playerAP = 3; state.hasSummoned = false;
+            state.playerField.forEach(c => { if(c) c.ready = true; });
+            updateBaseNumber(); updateUI(); setStatus("자네의 차례일세.");
+        }
+
+        function gcd(a, b) { while (b) { a %= b; [a, b] = [b, a]; } return a; }
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+        function isPrime(num) {
+            if(num<=1) return false; if(num<=3) return true;
+            if(num%2===0 || num%3===0) return false;
+            for(let i=5; i*i<=num; i+=6) if(num%i===0 || num%(i+2)===0) return false;
+            return true;
+        }
+        function setStatus(msg) {
+            const statusEl = document.getElementById('game-status');
+            if (statusEl) statusEl.innerText = msg;
+        }
+        function addLog(msg) {
+            const log = document.getElementById('battle-log');
+            if(!log) return;
+            const item = document.createElement('div');
+            item.className = 'border-r-2 border-[var(--parchment)] pr-2 py-0.5 text-right whitespace-nowrap overflow-hidden text-ellipsis';
+            item.innerText = `> ${msg}`;
+            log.appendChild(item);
+            if (log.childNodes.length > 10) log.removeChild(log.firstChild);
+        }
+        function showEffect(emoji, containerId, slotIdx) {
+            const layer = document.getElementById('effect-layer');
+            if(!layer) return;
+            const el = document.createElement('div');
+            el.className = 'absolute text-6xl blood-splatter z-50 pointer-events-none';
+            if (slotIdx === -1) {
+                const target = document.getElementById(containerId);
+                if(target) {
+                    const rect = target.getBoundingClientRect();
+                    el.style.left = `${rect.left + rect.width/2 - 30}px`; el.style.top = `${rect.top + rect.height/2 - 30}px`;
+                }
+            } else {
+                const container = document.getElementById(containerId);
+                if(container) {
+                    const slot = container.querySelectorAll('.slot')[slotIdx];
+                    if(slot) {
+                        const rect = slot.getBoundingClientRect();
+                        el.style.left = `${rect.left + rect.width/2 - 30}px`; el.style.top = `${rect.top + rect.height/2 - 30}px`;
+                    }
+                }
+            }
+            el.innerText = emoji; layer.appendChild(el);
+            setTimeout(() => el.remove(), 600);
+        }
+        function showDamage(amount, containerId) {
+            const layer = document.getElementById('effect-layer');
+            if(!layer) return;
+            const el = document.createElement('div');
+            el.className = 'damage-text';
+            el.innerText = `-${amount}`;
+            const target = document.getElementById(containerId);
+            if(target) {
+                const rect = target.getBoundingClientRect();
+                el.style.left = `${rect.left + rect.width/2 - 40}px`; 
+                el.style.top = `${rect.top + rect.height/2 - 40}px`;
+            }
+            layer.appendChild(el);
+            setTimeout(() => el.remove(), 1000);
+            
+            document.body.classList.add('shake-screen');
+            setTimeout(() => document.body.classList.remove('shake-screen'), 400);
+
+            const vignette = document.querySelector('.vignette');
+            if(vignette) {
+                vignette.classList.add('flash-overlay');
+                setTimeout(() => vignette.classList.remove('flash-overlay'), 300);
+            }
+        }
+        function checkGameEnd() {
+            if (state.playerHP <= 0 || state.aiHP <= 0) {
+                const win = state.aiHP <= 0;
+                const modal = document.getElementById('result-modal');
+                if(modal) {
+                    modal.classList.remove('hidden'); modal.classList.add('flex');
+                    document.getElementById('result-icon').innerText = win ? '🏆' : '☠️';
+                    document.getElementById('result-title').innerText = win ? '승리' : '패배';
+                    document.getElementById('result-desc').innerText = win ? "심연의 수수께끼를 풀어냈군." : "자네의 영혼은 숫자의 무덤에 묻혔네.";
+                }
+                state.isTutorial = false;
+                return true;
+            }
+            return false;
+        }
+
+        function renderDictionary() {
+            const container = document.getElementById('dict-magic-list');
+            if(!container) return;
+            container.innerHTML = '';
+            MAGIC_TYPES.forEach(magic => {
+                const el = document.createElement('div');
+                el.className = 'border border-purple-900 bg-[#2a1b38]/80 p-4 rounded flex flex-col gap-2';
+                el.innerHTML = `
+                    <div class="flex items-center justify-between border-b border-purple-800 pb-2 mb-1">
+                        <span class="text-purple-400 font-bold text-[10px] uppercase">MAGIC</span>
+                        <span class="text-[var(--parchment)] font-black text-sm">${magic.name}</span>
+                    </div>
+                    <p class="text-[11px] opacity-80 leading-relaxed text-[var(--parchment)]">${magic.desc}</p>
+                `;
+                container.appendChild(el);
+            });
+        }
+        renderDictionary();
+    </script>
+</body>
+</html>
