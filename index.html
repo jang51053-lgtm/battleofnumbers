@@ -1122,23 +1122,18 @@
                 state.isPlayerTurn = myDice > enemyDice;
             }
             
-            await sleep(2000); startGame();
+            await sleep(2000); 
+            
+            // 🔥 여기서 모드에 따라 완전히 다른 시작 함수를 호출!
+            if (state.isPvpMode) {
+                startPvpGame();
+            } else {
+                startLocalGame();
+            }
         }
 
-        function startGame() {
-            if (state.isPvpMode && currentRoomData) {
-                const enemy = currentRoomData[state.oppRole];
-                document.getElementById('ai-name').innerText = enemy.name;
-                document.getElementById('ai-avatar').innerText = enemy.icon;
-                
-                // PVP 게임 시작 화면 연동
-                syncPvpState(currentRoomData.gameState);
-                updateInfoPanel(null); 
-                showScreen('game-screen');
-                return; // PVP는 syncPvpState로 UI 업데이트 끝.
-            }
-
-            // 로컬 AI 로직
+        // [수정됨] 로컬 AI 전용 게임 시작
+        function startLocalGame() {
             const config = state.difficultyConfigs[state.difficulty];
             state.playerHP = 50; state.aiHP = config.hp; state.aiMaxHP = config.hp;
             state.playerHand = []; state.aiHand = []; state.playerDeck = []; state.aiDeck = [];
@@ -1162,6 +1157,26 @@
             
             updateBaseNumber(); updateUI(); showScreen('game-screen');
             if (!state.isPlayerTurn) startAITurn();
+        }
+
+        // [새로 추가됨] PVP 전용 게임 시작
+        function startPvpGame() {
+            if (!currentRoomData) {
+                alert("전장 데이터를 불러오지 못했습니다. 로비로 돌아갑니다.");
+                leaveWaitingRoom();
+                return;
+            }
+
+            const enemy = currentRoomData[state.oppRole];
+            document.getElementById('ai-name').innerText = enemy.name;
+            document.getElementById('ai-avatar').innerText = enemy.icon;
+            
+            // 서버에서 넘어온 덱, 패, 필드 정보를 내 화면에 동기화
+            syncPvpState(currentRoomData.gameState);
+            updateInfoPanel(null); 
+            showScreen('game-screen');
+            
+            // 주의: PvP에서는 startAITurn()을 절대 호출하지 않음!
         }
 
         function generateCard(range) {
