@@ -235,9 +235,7 @@
             </div>
 
             <!-- 방 목록 렌더링 영역 -->
-            <div id="room-list" class="flex flex-col gap-3 min-h-[300px]">
-                <!-- 동적으로 채워짐 -->
-            </div>
+            <div id="room-list" class="flex flex-col gap-3 min-h-[300px]"></div>
         </div>
     </div>
 
@@ -322,7 +320,7 @@
                         </div>
                         <div>
                             <h4 class="font-bold text-lg text-cyan-300 mb-2">희귀 카드 (1)</h4>
-                            <p class="text-xs opacity-80 leading-relaxed">모든 수의 약수. <span class="text-yellow-400 font-bold">자신 단 하나만 희생하여</span> 어떤 2성, 3성 카드든 즉시 소환할 수 있는 궁극의 제물입니다.</p>
+                            <p class="text-xs opacity-80 leading-relaxed">궁극의 제물. <span class="text-yellow-400 font-bold">이 카드 단 1장만 희생하면</span> 어떤 2성, 3성 카드든 묻지도 따지지도 않고 즉시 소환할 수 있습니다.</p>
                         </div>
                     </div>
                     <div class="border border-blue-900 bg-blue-950/30 p-5 flex gap-6 items-center">
@@ -403,7 +401,8 @@
 
     <div id="game-screen" class="screen flex-col relative z-10 overflow-hidden h-screen">
         
-        <div id="narrator-box" class="absolute top-[35%] left-4 md:left-8 w-60 md:w-80 bg-black/95 border-2 border-purple-900 p-4 flex flex-col items-start gap-2 z-[150] shadow-[0_0_20px_rgba(168,85,247,0.5)] transition-all hidden">
+        <!-- 튜토리얼 텍스트 (위치 좌측으로 이동, 클릭 통과 속성 부여) -->
+        <div id="narrator-box" class="absolute top-[35%] left-4 md:left-8 w-60 md:w-80 bg-black/95 border-2 border-purple-900 p-4 flex flex-col items-start gap-2 z-[150] shadow-[0_0_20px_rgba(168,85,247,0.5)] transition-all pointer-events-none hidden">
             <div class="flex items-center gap-2 border-b border-purple-800 w-full pb-1">
                 <div class="text-2xl animate-bounce">🧿</div>
                 <h4 class="font-bold text-[10px] text-purple-400 uppercase tracking-widest">안내자</h4>
@@ -619,7 +618,7 @@
         function openCreateRoomModal() {
             document.getElementById('create-room-modal').classList.remove('hidden');
             document.getElementById('create-room-modal').classList.add('flex');
-            document.getElementById('room-name-input').focus();
+            setTimeout(() => { document.getElementById('room-name-input').focus(); }, 100);
         }
 
         function closeCreateRoomModal() {
@@ -648,14 +647,14 @@
             newRoomRef.onDisconnect().remove();
 
             closeCreateRoomModal();
-            document.getElementById('room-name-input').value = ''; // 다음 생성을 위해 입력창 초기화
+            document.getElementById('room-name-input').value = '';
             showScreen('pvp-waiting-screen');
             listenToCurrentRoom();
         }
 
         // 실시간 방 목록 수신
         function listenToRooms() {
-            db.ref('rooms').off('value'); // 중복 리스너 방지
+            db.ref('rooms').off('value'); 
             db.ref('rooms').on('value', snap => {
                 const data = snap.val() || {};
                 const roomsList = Object.keys(data)
@@ -670,7 +669,6 @@
             });
         }
 
-        // 수동 새로고침
         function refreshRooms() {
             const btn = document.querySelector('button[onclick="refreshRooms()"]');
             if(btn) { btn.innerText = "갱신 중..."; btn.disabled = true; }
@@ -815,7 +813,7 @@
                 } else if(data.status === 'playing') {
                     if(document.getElementById('pvp-waiting-screen').classList.contains('active')) {
                         alert("전장이 개방되었습니다! 주사위를 굴립니다.");
-                        initGameFlow('pvp'); 
+                        initGameFlow('pvp', data.dice); 
                     }
                 }
             });
@@ -903,11 +901,19 @@
             });
         }
 
+        // 게임 시작 및 파이어베이스 주사위 동기화 생성
         function startPvpMatch() {
             if(!isHost || !currentRoomId) return;
             const canStart = currentRoomData.challenger && currentRoomData.host.isReady && currentRoomData.challenger.isReady;
             if(canStart) {
-                db.ref('rooms/' + currentRoomId).update({ status: 'playing' });
+                // 호스트가 공정하게 주사위를 굴리고 서버에 전송
+                const hostDice = Math.floor(Math.random()*6)+1;
+                const chalDice = Math.floor(Math.random()*6)+1;
+                
+                db.ref('rooms/' + currentRoomId).update({ 
+                    status: 'playing',
+                    dice: { host: hostDice, chal: chalDice }
+                });
             }
         }
         // --- PVP 시스템 로직 끝 ---
@@ -967,18 +973,35 @@
             showNarrator("자네, 이 심연에 처음 온 모양이군.\n먼저 손패의 '3'(1성) 카드를 클릭하거나 드래그해 빈 슬롯에 소환해보게나. (일반소환은 AP 1 소모)");
         }
 
-        async function initGameFlow(diff) {
+        async function initGameFlow(diff, pvpDice = null) {
             state.isTutorial = false;
             state.difficulty = diff; showScreen('dice-screen');
             await sleep(1000);
             
-            // PVP일 때도 동일하게 주사위 굴림을 연출합니다.
-            const pDice = Math.floor(Math.random()*6)+1, aDice = Math.floor(Math.random()*6)+1;
-            document.getElementById('player-dice').innerText = pDice;
-            document.getElementById('ai-dice').innerText = aDice;
+            let myDice, enemyDice;
+            
+            // PVP일 경우 서버에서 굴린 주사위 값을 배정
+            if (diff === 'pvp' && pvpDice) {
+                myDice = isHost ? pvpDice.host : pvpDice.chal;
+                enemyDice = isHost ? pvpDice.chal : pvpDice.host;
+            } else {
+                myDice = Math.floor(Math.random()*6)+1;
+                enemyDice = Math.floor(Math.random()*6)+1;
+            }
+            
+            document.getElementById('player-dice').innerText = myDice;
+            document.getElementById('ai-dice').innerText = enemyDice;
             document.getElementById('dice-result').style.opacity = '1';
-            document.getElementById('dice-result').innerText = pDice >= aDice ? "자네가 먼저 시작하게." : "운명이 적을 선택했군.";
-            state.isPlayerTurn = pDice >= aDice;
+            
+            if (myDice === enemyDice) {
+                // 비겼을 경우 방장 우선
+                document.getElementById('dice-result').innerText = isHost ? "개척자의 이점으로 먼저 시작하게." : "방장이 먼저 시작하네.";
+                state.isPlayerTurn = isHost ? true : false;
+            } else {
+                document.getElementById('dice-result').innerText = myDice > enemyDice ? "자네가 먼저 시작하게." : "운명이 적을 선택했군.";
+                state.isPlayerTurn = myDice > enemyDice;
+            }
+            
             await sleep(2000); startGame();
         }
 
@@ -1176,6 +1199,7 @@
                     if(card.type === 'monster' && !card.isPrime) {
                         const tgt = state.playerField[idx];
                         if (card.stars === 1 && !tgt && !state.hasSummoned) valid = true;
+                        // 1카드 궁극 제물화 적용: 대상이 1이면 무조건 소환 가능
                         if (card.stars === 2 && tgt && (card.num % tgt.num === 0 || tgt.num === 1)) valid = true;
                         if (card.stars === 3 && tgt) {
                             if (tgt.num === 1) valid = true;
@@ -1441,6 +1465,7 @@
             } else if (card.stars === 3) {
                 if (!targetCard) return setStatus(`제물 위에 내려놓게나.`);
                 
+                // 1카드 궁극 제물 기능 (1장만으로 3성 소환 가능)
                 if (targetCard.num === 1) {
                     showEffect('💀', 'player-field', idx);
                     state.playerField[idx] = { ...card, ready: false };
