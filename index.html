@@ -178,7 +178,6 @@
         </div>
     </div>
 
-    <!-- PVP 프로필 생성 모달 -->
     <div id="profile-modal" class="fixed inset-0 hidden items-center justify-center z-[200] p-6 bg-black/95 backdrop-blur-md">
         <div class="border-2 border-red-900 bg-[#0a0a0a] p-8 max-w-sm w-full shadow-[0_0_50px_rgba(153,27,27,0.4)] flex flex-col items-center">
             <h3 class="text-2xl font-black mb-2 uppercase tracking-widest text-red-500">영혼 각인</h3>
@@ -203,7 +202,6 @@
         </div>
     </div>
 
-    <!-- PVP 로비 화면 -->
     <div id="pvp-lobby-screen" class="screen flex-col items-center p-6 overflow-y-auto z-10 hide-scrollbar">
         <button onclick="exitLobby()" class="absolute top-6 left-6 text-red-500 hover:opacity-50 transition-all font-bold">
             [ 투기장 나가기 ]
@@ -239,7 +237,6 @@
         </div>
     </div>
 
-    <!-- 방 만들기 모달 -->
     <div id="create-room-modal" class="fixed inset-0 hidden items-center justify-center z-[200] p-6 bg-black/95 backdrop-blur-md">
         <div class="border-2 border-red-900 bg-[#0a0a0a] p-8 max-w-sm w-full shadow-[0_0_50px_rgba(153,27,27,0.4)]">
             <h3 class="text-2xl font-black mb-6 uppercase tracking-widest text-red-500 text-center">전장 개설</h3>
@@ -255,7 +252,6 @@
         </div>
     </div>
 
-    <!-- PVP 대기방 화면 -->
     <div id="pvp-waiting-screen" class="screen flex-col items-center p-6 overflow-y-auto z-10 hide-scrollbar">
         <button onclick="leaveWaitingRoom()" class="absolute top-6 left-6 text-red-500 hover:opacity-50 transition-all font-bold">
             [ 전장 이탈 ]
@@ -298,6 +294,13 @@
         </div>
     </div>
 
+    <!-- 턴 전환 알림 배너 -->
+    <div id="turn-banner" class="fixed inset-0 flex items-center justify-center z-[150] pointer-events-none opacity-0 transition-opacity duration-300">
+        <div id="turn-banner-bg" class="w-full h-32 bg-black/80 flex items-center justify-center border-y border-[var(--parchment)]/30">
+            <div id="turn-banner-text" class="text-4xl md:text-6xl font-black tracking-[0.2em] uppercase">나의 턴</div>
+        </div>
+    </div>
+
     <!-- 도감 화면 -->
     <div id="dictionary-screen" class="screen flex-col items-center p-6 overflow-y-auto z-10 hide-scrollbar">
         <button onclick="showScreen('home-screen')" class="absolute top-6 left-6 text-[var(--parchment)] hover:opacity-50 transition-all font-bold">
@@ -329,7 +332,7 @@
                         </div>
                         <div>
                             <h4 class="font-bold text-lg text-blue-300 mb-2">위대한 소수 (Prime)</h4>
-                            <p class="text-xs opacity-80 leading-relaxed">10 이상의 소수는 약수가 없으므로 일반적인 소환이 불가능합니다. 오직 <span class="text-purple-400 font-bold">'소수 소환'</span> 마법을 통해서만 덱에서 강림합니다.</p>
+                            <p class="text-xs opacity-80 leading-relaxed">10 이상의 소수는 약수가 없으므로 일반적인 소환이 불가능합니다. 일반 뽑기로는 등장하지 않으며, 오직 <span class="text-purple-400 font-bold">'소수 소환'</span> 마법을 통해서만 덱에서 강림합니다.</p>
                         </div>
                     </div>
                 </div>
@@ -434,13 +437,15 @@
                         <h3 id="ai-name" class="font-bold text-[10px] uppercase tracking-widest text-red-500">적 본체</h3>
                         <span id="ai-deck-count" class="text-[8px] opacity-50 text-white hidden"></span>
                     </div>
-                    <div class="w-36 h-1.5 bg-black border border-red-900/50">
+                    <!-- 적 체력바 -->
+                    <div class="w-36 h-3 bg-black border border-red-900/50 relative">
                         <div id="ai-hp-bar" class="hp-segment bg-red-700" style="width: 100%"></div>
+                        <div id="ai-hp-text" class="absolute inset-0 flex items-center justify-center text-[10px] font-black text-white" style="text-shadow: 1px 1px 0 #000, -1px -1px 0 #000;">50 / 50</div>
                     </div>
                 </div>
             </div>
 
-            <div id="ai-field" class="flex gap-3 md:gap-5 h-24 md:h-32 shrink-0">
+            <div id="ai-field" class="flex gap-3 md:gap-5 h-24 md:h-32 shrink-0 mt-2">
                 <div class="slot w-[72px] md:w-24 h-full rounded-sm transition-all" data-index="0"></div>
                 <div class="slot w-[72px] md:w-24 h-full rounded-sm transition-all" data-index="1"></div>
                 <div class="slot w-[72px] md:w-24 h-full rounded-sm transition-all" data-index="2"></div>
@@ -455,7 +460,7 @@
                 <div class="flex-grow h-[1px] bg-[var(--parchment)] opacity-20"></div>
             </div>
 
-            <div id="player-field" class="flex gap-3 md:gap-5 h-24 md:h-32 shrink-0">
+            <div id="player-field" class="flex gap-3 md:gap-5 h-24 md:h-32 shrink-0 mb-2">
                 <div class="slot w-[72px] md:w-24 h-full rounded-sm transition-all" data-index="0"></div>
                 <div class="slot w-[72px] md:w-24 h-full rounded-sm transition-all" data-index="1"></div>
                 <div class="slot w-[72px] md:w-24 h-full rounded-sm transition-all" data-index="2"></div>
@@ -468,8 +473,9 @@
                     <div class="flex gap-4 items-center">
                         <div class="flex items-center gap-1.5">
                             <span class="text-[10px] uppercase font-bold opacity-60">AP</span>
+                            <!-- AP 점수 컨테이너: 4개로 증가됨 -->
                             <div id="ap-container" class="flex gap-1">
-                                <div class="action-point"></div><div class="action-point"></div><div class="action-point"></div>
+                                <div class="action-point"></div><div class="action-point"></div><div class="action-point"></div><div class="action-point"></div>
                             </div>
                         </div>
                         <div class="h-3 w-px bg-[var(--parchment)] opacity-30"></div>
@@ -483,8 +489,10 @@
                             <span class="text-[10px] uppercase font-bold opacity-60">나의 영혼</span>
                             <span id="hand-count-label" class="text-[9px] uppercase font-bold opacity-60">패 3/6</span>
                         </div>
-                        <div class="w-48 h-1.5 bg-black border border-[var(--parchment)]/30">
+                        <!-- 내 체력바 -->
+                        <div class="w-48 h-3 bg-black border border-[var(--parchment)]/30 relative">
                             <div id="player-hp-bar" class="hp-segment bg-white" style="width: 100%"></div>
+                            <div id="player-hp-text" class="absolute inset-0 flex items-center justify-center text-[10px] font-black text-white" style="text-shadow: 1px 1px 0 #000, -1px -1px 0 #000;">50 / 50</div>
                         </div>
                     </div>
                 </div>
@@ -511,14 +519,20 @@
         <div id="effect-layer" class="fixed inset-0 pointer-events-none z-50 flex items-center justify-center"></div>
     </div>
 
-    <div id="result-modal" class="fixed inset-0 hidden items-center justify-center z-[100] p-6 bg-black/90 backdrop-blur-sm">
+    <!-- 결과 확인 모달 -->
+    <div id="result-modal" class="fixed inset-0 hidden items-center justify-center z-[200] p-6 bg-black/90 backdrop-blur-sm">
         <div class="border-2 border-[var(--parchment)] bg-[#0a0a0a] p-10 max-w-sm w-full text-center shadow-[0_0_30px_rgba(212,180,131,0.2)]">
             <div id="result-icon" class="text-6xl mb-6">💀</div>
             <h2 id="result-title" class="text-3xl font-black mb-3 uppercase tracking-widest">결과</h2>
             <p id="result-desc" class="text-xs opacity-60 mb-8 leading-relaxed">...</p>
-            <div class="flex flex-col gap-3">
-                <button id="btn-restart" onclick="showScreen('stage-screen')" class="py-3 border border-[var(--parchment)] hover:bg-[var(--parchment)] hover:text-black text-sm font-bold uppercase transition-all">다시 시도</button>
-                <button onclick="leaveWaitingRoom()" class="py-1 text-[10px] opacity-30 hover:opacity-100 transition-all">메인 화면으로</button>
+            
+            <div id="result-local-btns" class="flex flex-col gap-3">
+                <button onclick="showScreen('stage-screen')" class="py-3 border border-[var(--parchment)] hover:bg-[var(--parchment)] hover:text-black text-sm font-bold uppercase transition-all">다시 시도</button>
+                <button onclick="showScreen('home-screen')" class="py-1 text-[10px] opacity-30 hover:opacity-100 transition-all">메인 화면으로</button>
+            </div>
+            
+            <div id="result-pvp-btns" class="flex flex-col gap-3 hidden">
+                <button onclick="exitPvpResult()" class="py-4 bg-red-900 text-white hover:bg-red-700 text-sm font-bold uppercase tracking-widest transition-all w-full">투기장 나가기</button>
             </div>
         </div>
     </div>
@@ -560,7 +574,7 @@
             playerHP: 50, playerMaxHP: 50, aiHP: 50, aiMaxHP: 50,
             playerHand: [], aiHand: [], playerDeck: [], aiDeck: [],
             playerField: [null, null, null], aiField: [null, null, null],
-            playerAP: 3, hasSummoned: false, baseNumber: 7,
+            playerAP: 4, hasSummoned: false, baseNumber: 7, // AP 4로 변경됨
             isPlayerTurn: true, isProcessing: false,
             selectedHandIdx: null, selectedFieldIdx: null, draggedHandIdx: null,
             activeMagicSourceIdx: null,
@@ -571,6 +585,7 @@
             myRole: null, 
             oppRole: null,
             lastLog: "",
+            isGameOver: false,
 
             difficultyConfigs: {
                 1: { name: '눈먼 들개', range: 20, hp: 40, avatar: '🐺' },
@@ -781,6 +796,13 @@
             showScreen('pvp-lobby-screen');
             listenToRooms();
         }
+        
+        function exitPvpResult() {
+            // 결과창 모달에서 나가는 함수
+            document.getElementById('result-modal').classList.add('hidden');
+            document.getElementById('result-modal').classList.remove('flex');
+            leaveWaitingRoom();
+        }
 
         function kickChallenger() {
             if(!isHost || !currentRoomId) return;
@@ -802,7 +824,7 @@
                 
                 if(!data) {
                     if(currentRoomId) {
-                        alert("전장이 소멸되었습니다.");
+                        if (!state.isGameOver) alert("전장이 소멸되었습니다."); // 게임 진행중일때만 알림
                         currentRoomId = null;
                         currentRoomData = null;
                         state.isPvpMode = false;
@@ -833,6 +855,8 @@
                         // 게임 진행 중 실시간 동기화
                         syncPvpState(data.gameState);
                     }
+                } else if (data.status === 'finished') {
+                    // 게임 종료 후 결과창만 띄워둔 상태 (동기화 중지)
                 }
             });
         }
@@ -907,31 +931,59 @@
             }
         }
 
+        // 턴 전환 배너 함수
+        function showTurnBanner(isMyTurn) {
+            const banner = document.getElementById('turn-banner');
+            const text = document.getElementById('turn-banner-text');
+            const bg = document.getElementById('turn-banner-bg');
+            if (isMyTurn) {
+                text.innerText = "나의 턴";
+                text.className = "text-4xl md:text-6xl font-black tracking-[0.2em] uppercase text-[var(--parchment)] drop-shadow-[0_0_15px_rgba(212,180,131,0.8)]";
+                bg.className = "w-full h-32 bg-black/90 flex items-center justify-center border-y-2 border-[var(--parchment)]/50";
+            } else {
+                text.innerText = "상대의 턴";
+                text.className = "text-4xl md:text-6xl font-black tracking-[0.2em] uppercase text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.8)]";
+                bg.className = "w-full h-32 bg-red-950/90 flex items-center justify-center border-y-2 border-red-900/50";
+            }
+            banner.classList.remove('opacity-0');
+            banner.classList.add('opacity-100');
+            setTimeout(() => {
+                banner.classList.remove('opacity-100');
+                banner.classList.add('opacity-0');
+            }, 1500);
+        }
+
         // 게임 시작 및 파이어베이스 덱/주사위 동기화 생성
         function startPvpMatch() {
             if(!isHost || !currentRoomId) return;
             const canStart = currentRoomData.challenger && currentRoomData.host.isReady && currentRoomData.challenger.isReady;
             if(canStart) {
-                // 호스트가 공정하게 덱과 주사위를 굴리고 서버에 전송
                 const hostDice = Math.floor(Math.random()*6)+1;
                 const chalDice = Math.floor(Math.random()*6)+1;
-                const hostFirst = hostDice >= chalDice; // 같으면 호스트 선공
+                const hostFirst = hostDice >= chalDice; 
                 
                 const config = state.difficultyConfigs['pvp'];
                 let hostDeck = [], chalDeck = [];
                 for(let i=0; i<40; i++) hostDeck.push(generateCard(config.range));
                 for(let i=0; i<40; i++) chalDeck.push(generateCard(config.range));
 
-                let hostHand = hostDeck.splice(0, 3);
-                let chalHand = chalDeck.splice(0, 3);
+                // 뽑기 로직: 소수(Prime)를 제외하고 뽑음
+                let hostHand = [], chalHand = [];
+                for(let i=0; i<3; i++) {
+                    let hIdx = hostDeck.findIndex(c => !c.isPrime);
+                    if(hIdx !== -1) hostHand.push(hostDeck.splice(hIdx, 1)[0]);
+                    
+                    let cIdx = chalDeck.findIndex(c => !c.isPrime);
+                    if(cIdx !== -1) chalHand.push(chalDeck.splice(cIdx, 1)[0]);
+                }
 
                 const gameState = {
                     turn: hostFirst ? 'host' : 'challenger',
                     turnCount: 1,
                     baseNumber: Math.floor(Math.random() * (config.range / 2)) + 2,
                     dice: { host: hostDice, chal: chalDice },
-                    host: { hp: 50, ap: 3, hasSummoned: false, hand: hostHand, deck: hostDeck, field: [false, false, false] },
-                    challenger: { hp: 50, ap: 3, hasSummoned: false, hand: chalHand, deck: chalDeck, field: [false, false, false] },
+                    host: { hp: 50, ap: 4, hasSummoned: false, hand: hostHand, deck: hostDeck, field: [false, false, false] },
+                    challenger: { hp: 50, ap: 4, hasSummoned: false, hand: chalHand, deck: chalDeck, field: [false, false, false] },
                     lastLog: "전장이 개방되었네."
                 };
 
@@ -944,6 +996,9 @@
 
         // PVP 실시간 상태 동기화 처리 함수
         function syncPvpState(gs) {
+            const prevTurnCount = state.turnCount;
+            const wasMyTurn = state.isPlayerTurn;
+
             state.turnCount = gs.turnCount;
             state.baseNumber = gs.baseNumber;
             document.getElementById('base-number').innerText = state.baseNumber;
@@ -957,7 +1012,6 @@
             state.playerHand = myData.hand ? Object.values(myData.hand) : [];
             state.playerDeck = myData.deck ? Object.values(myData.deck) : [];
             
-            // Firebase는 빈 배열 인덱스를 무시하므로 false를 null로 복원
             const sanitizeField = (f) => {
                 if(!f) return [null, null, null];
                 return [f[0] ? f[0] : null, f[1] ? f[1] : null, f[2] ? f[2] : null];
@@ -965,22 +1019,27 @@
             state.playerField = sanitizeField(myData.field);
 
             state.aiHP = oppData.hp || 0;
-            // 적의 정보 (적 덱은 카운트만 활용, 패는 숨김처리하되 로직상 동기화)
             state.aiHand = oppData.hand ? Object.values(oppData.hand) : [];
             state.aiDeck = oppData.deck ? Object.values(oppData.deck) : [];
             state.aiField = sanitizeField(oppData.field);
 
-            // 적의 덱 정보 UI 업데이트
             const aiDeckCountEl = document.getElementById('ai-deck-count');
             if(aiDeckCountEl) {
                 aiDeckCountEl.innerText = `(남은 덱: ${state.aiDeck.length})`;
                 aiDeckCountEl.classList.remove('hidden');
             }
 
-            const wasMyTurn = state.isPlayerTurn;
             state.isPlayerTurn = (gs.turn === state.myRole);
             
-            if (!wasMyTurn && state.isPlayerTurn) {
+            // 턴 전환 배너 출력 로직
+            if (!wasMyTurn && state.isPlayerTurn && prevTurnCount === state.turnCount) {
+                showTurnBanner(true);
+                setStatus("자네의 차례일세.");
+            } else if (wasMyTurn && !state.isPlayerTurn) {
+                showTurnBanner(false);
+                setStatus("상대의 차례일세...");
+            } else if (prevTurnCount !== state.turnCount && state.isPlayerTurn) {
+                showTurnBanner(true);
                 setStatus("자네의 차례일세.");
             }
 
@@ -993,11 +1052,9 @@
             checkGameEnd();
         }
 
-        // 나의 액션을 파이어베이스에 푸시하는 함수
         function pushPvpState(logMsg) {
             if (!state.isPvpMode || !currentRoomId) return;
 
-            // null 대신 false를 넣어 Firebase가 배열 길이를 축소하지 않도록 방어
             const safeMyField = [state.playerField[0]||false, state.playerField[1]||false, state.playerField[2]||false];
             const safeAiField = [state.aiField[0]||false, state.aiField[1]||false, state.aiField[2]||false];
 
@@ -1019,9 +1076,6 @@
 
             db.ref('rooms/' + currentRoomId + '/gameState').update(updateData);
         }
-
-        // --- PVP 시스템 로직 끝 ---
-
 
         // ==========================================
         // 기존 로컬 게임 / 공통 로직
@@ -1051,6 +1105,7 @@
             state.tutStep = 0;
             state.difficulty = 99; 
             state.playerHP = 50; state.aiHP = 10; state.aiMaxHP = 10;
+            state.isGameOver = false;
             
             state.playerHand = [
                 { type: 'monster', num: 3, stars: 1, ready: false, isPrime: false },
@@ -1062,13 +1117,12 @@
             state.playerField = [null, null, null];
             state.aiField = [{ type: 'monster', num: 2, stars: 1, ready: true, isPrime: false }, null, null];
             
-            state.playerAP = 3; state.hasSummoned = false;
+            state.playerAP = 4; state.hasSummoned = false; // AP 4로 변경됨
             state.selectedHandIdx = null; state.selectedFieldIdx = null; state.draggedHandIdx = null; state.activeMagicSourceIdx = null;
             
             document.getElementById('ai-name').innerText = state.difficultyConfigs[99].name;
             document.getElementById('ai-avatar').innerText = state.difficultyConfigs[99].avatar;
-            document.getElementById('ai-deck-count').classList.add('hidden'); // 로컬에선 숨김
-            document.getElementById('btn-restart').classList.remove('hidden'); // 로컬 재시작 보임
+            document.getElementById('ai-deck-count').classList.add('hidden'); 
             
             state.baseNumber = 5;
             document.getElementById('base-number').innerText = state.baseNumber;
@@ -1077,6 +1131,7 @@
             updateInfoPanel(null); 
             updateUI(); 
             showScreen('game-screen');
+            showTurnBanner(true);
             
             showNarrator("자네, 이 심연에 처음 온 모양이군.\n먼저 손패의 '3'(1성) 카드를 클릭하거나 드래그해 빈 슬롯에 소환해보게나. (일반소환은 AP 1 소모)");
         }
@@ -1089,19 +1144,15 @@
                 state.isPvpMode = true;
                 state.myRole = isHost ? 'host' : 'challenger';
                 state.oppRole = isHost ? 'challenger' : 'host';
-                document.getElementById('btn-restart').classList.add('hidden'); // PVP에선 재시도 가림
             } else {
                 state.isPvpMode = false;
                 document.getElementById('ai-deck-count').classList.add('hidden');
-                document.getElementById('btn-restart').classList.remove('hidden');
             }
             
             showScreen('dice-screen');
             await sleep(1000);
             
             let myDice, enemyDice;
-            
-            // PVP일 경우 서버에서 굴린 주사위 값을 배정
             if (state.isPvpMode && pvpDice) {
                 myDice = isHost ? pvpDice.host : pvpDice.chal;
                 enemyDice = isHost ? pvpDice.chal : pvpDice.host;
@@ -1124,7 +1175,6 @@
             
             await sleep(2000); 
             
-            // 🔥 여기서 모드에 따라 완전히 다른 시작 함수를 호출!
             if (state.isPvpMode) {
                 startPvpGame();
             } else {
@@ -1132,23 +1182,33 @@
             }
         }
 
-        // [수정됨] 로컬 AI 전용 게임 시작
         function startLocalGame() {
             const config = state.difficultyConfigs[state.difficulty];
             state.playerHP = 50; state.aiHP = config.hp; state.aiMaxHP = config.hp;
             state.playerHand = []; state.aiHand = []; state.playerDeck = []; state.aiDeck = [];
             state.playerField = [null,null,null]; state.aiField = [null,null,null];
-            state.playerAP = 3; state.hasSummoned = false;
+            state.playerAP = 4; state.hasSummoned = false; // AP 4로 변경됨
             state.selectedHandIdx = null; state.selectedFieldIdx = null; state.draggedHandIdx = null;
             state.activeMagicSourceIdx = null;
+            state.isGameOver = false;
             
             for(let i=0; i<40; i++) {
                 state.playerDeck.push(generateCard(config.range));
                 state.aiDeck.push(generateCard(config.range));
             }
-            for(let i=0; i<3; i++) {
-                state.playerHand.push(state.playerDeck.shift());
-                state.aiHand.push(state.aiDeck.shift());
+            
+            // 일반 뽑기로는 소수(Prime)를 건너뜀
+            let pDraws = 0;
+            while(pDraws < 3 && state.playerDeck.length > 0) {
+                let idx = state.playerDeck.findIndex(c => !c.isPrime);
+                if(idx !== -1) { state.playerHand.push(state.playerDeck.splice(idx, 1)[0]); pDraws++; }
+                else break;
+            }
+            let aDraws = 0;
+            while(aDraws < 3 && state.aiDeck.length > 0) {
+                let idx = state.aiDeck.findIndex(c => !c.isPrime);
+                if(idx !== -1) { state.aiHand.push(state.aiDeck.splice(idx, 1)[0]); aDraws++; }
+                else break;
             }
             
             document.getElementById('ai-name').innerText = config.name;
@@ -1156,10 +1216,11 @@
             updateInfoPanel(null); 
             
             updateBaseNumber(); updateUI(); showScreen('game-screen');
+            showTurnBanner(state.isPlayerTurn);
+            
             if (!state.isPlayerTurn) startAITurn();
         }
 
-        // [새로 추가됨] PVP 전용 게임 시작
         function startPvpGame() {
             if (!currentRoomData) {
                 alert("전장 데이터를 불러오지 못했습니다. 로비로 돌아갑니다.");
@@ -1171,12 +1232,12 @@
             document.getElementById('ai-name').innerText = enemy.name;
             document.getElementById('ai-avatar').innerText = enemy.icon;
             
-            // 서버에서 넘어온 덱, 패, 필드 정보를 내 화면에 동기화
+            state.isGameOver = false;
             syncPvpState(currentRoomData.gameState);
             updateInfoPanel(null); 
             showScreen('game-screen');
             
-            // 주의: PvP에서는 startAITurn()을 절대 호출하지 않음!
+            showTurnBanner(state.isPlayerTurn);
         }
 
         function generateCard(range) {
@@ -1263,12 +1324,16 @@
         }
 
         function updateUI() {
-            document.getElementById('player-hp-bar').style.width = `${Math.max(0, (state.playerHP/50)*100)}%`;
+            document.getElementById('player-hp-bar').style.width = `${Math.max(0, (state.playerHP/state.playerMaxHP)*100)}%`;
             document.getElementById('ai-hp-bar').style.width = `${Math.max(0, (state.aiHP/state.aiMaxHP)*100)}%`;
+            
+            document.getElementById('player-hp-text').innerText = `${Math.ceil(state.playerHP)} / ${state.playerMaxHP}`;
+            document.getElementById('ai-hp-text').innerText = `${Math.ceil(state.aiHP)} / ${state.aiMaxHP}`;
             
             const apCont = document.getElementById('ap-container');
             apCont.innerHTML = '';
-            for(let i=0; i<3; i++) apCont.innerHTML += `<div class="action-point ${i < state.playerAP ? '' : 'spent'}"></div>`;
+            // 반복문 i<4 로 변경되어 UI 상에 AP 4개가 렌더링됨
+            for(let i=0; i<4; i++) apCont.innerHTML += `<div class="action-point ${i < state.playerAP ? '' : 'spent'}"></div>`;
 
             document.getElementById('summon-status').innerText = state.hasSummoned ? "소모됨" : "가능";
             document.getElementById('summon-status').className = state.hasSummoned ? "text-[10px] text-red-500 font-bold uppercase" : "text-[10px] text-green-500 font-bold uppercase";
@@ -1750,12 +1815,17 @@
         function drawAction() {
             if(state.isTutorial) return setStatus("튜토리얼 중에는 막혀있다네.");
             if(!state.isPlayerTurn || state.playerAP <= 0 || state.playerHand.length >= 6) return;
-            if(state.playerDeck.length === 0) return setStatus("덱에 더 이상 카드가 없네.");
-            state.playerAP--; 
-            state.playerHand.push(state.playerDeck.shift());
-            state.activeMagicSourceIdx = null;
-            addLog("새 카드를 뽑았네."); updateUI();
-            if(state.isPvpMode) pushPvpState(`${myProfile.name}이(가) 카드를 뽑았네.`);
+            
+            const idx = state.playerDeck.findIndex(c => !c.isPrime);
+            if (idx !== -1) {
+                state.playerHand.push(state.playerDeck.splice(idx, 1)[0]);
+                state.playerAP--; 
+                state.activeMagicSourceIdx = null;
+                addLog("새 카드를 뽑았네."); updateUI();
+                if(state.isPvpMode) pushPvpState(`${myProfile.name}이(가) 카드를 뽑았네.`);
+            } else {
+                return setStatus("덱에 뽑을 수 있는 카드가 없네. (소수만 남음)");
+            }
         }
 
         async function attackAction(myIdx, enemyIdx) {
@@ -1823,6 +1893,8 @@
                     document.getElementById('result-icon').innerText = '🎉';
                     document.getElementById('result-title').innerText = '수습 완료';
                     document.getElementById('result-desc').innerText = "훌륭하군! 이제 심연의 규칙을 모두 깨우쳤네.";
+                    document.getElementById('result-local-btns').classList.remove('hidden');
+                    document.getElementById('result-pvp-btns').classList.add('hidden');
                     state.isTutorial = false;
                 }, 1500);
             }
@@ -1843,15 +1915,14 @@
             state.activeMagicSourceIdx = null;
             
             if (state.isPvpMode) {
-                // 내 필드 카드를 다시 휴식에서 준비 완료로 변경
                 state.playerField.forEach(c => { if(c) c.ready = true; });
                 state.turnCount++;
                 state.baseNumber = Math.floor(Math.random() * (state.difficultyConfigs['pvp'].range / 2)) + 2;
                 
-                // 내가 넘긴 후, 상대방의 데이터도 AP 3 회복 및 소환 초기화하도록 세팅
                 const safeMyField = [state.playerField[0]||false, state.playerField[1]||false, state.playerField[2]||false];
                 const safeAiField = [state.aiField[0]||false, state.aiField[1]||false, state.aiField[2]||false];
 
+                // 턴을 상대에게 넘길 때 AP를 4로 회복시켜 줍니다
                 const updateData = {
                     turn: state.oppRole,
                     turnCount: state.turnCount,
@@ -1860,7 +1931,7 @@
                     [`${state.myRole}/field`]: safeMyField,
                     [`${state.myRole}/hand`]: state.playerHand || [],
                     [`${state.myRole}/hp`]: state.playerHP,
-                    [`${state.oppRole}/ap`]: 3,
+                    [`${state.oppRole}/ap`]: 4, // AP 4 회복
                     [`${state.oppRole}/hasSummoned`]: false,
                     [`${state.oppRole}/field`]: safeAiField
                 };
@@ -1870,6 +1941,7 @@
                 return;
             }
 
+            showTurnBanner(false);
             updateUI(); await startAITurn();
         }
 
@@ -1878,7 +1950,8 @@
                 setStatus("상대의 차례일세...");
                 await sleep(1500);
                 
-                state.turnCount++; state.isPlayerTurn = true; state.playerAP = 3; state.hasSummoned = false;
+                // 내 턴으로 돌아올 때 AP를 4로 설정
+                state.turnCount++; state.isPlayerTurn = true; state.playerAP = 4; state.hasSummoned = false;
                 state.playerField.forEach(c => { if(c) c.ready = true; });
                 
                 if (state.tutStep === 1) {
@@ -1889,13 +1962,14 @@
                     showNarrator("이제 적의 방어선이 비었군!\n'13'을 클릭하고, 위에 있는 붉은 적 본체(허수아비)를 탭해 직접 타격하게!");
                 }
                 
+                showTurnBanner(true);
                 updateUI(); setStatus("자네의 차례일세.");
                 return;
             }
 
             setStatus("상대의 차례일세...");
             await sleep(1000);
-            let aiAP = 3;
+            let aiAP = 4; // AI의 AP도 4로 변경됨
             let aiHasSummoned = false;
             state.aiField.forEach(c => { if(c) c.ready = true; });
 
@@ -2010,9 +2084,13 @@
                 }
 
                 if (!actionTaken && state.aiDeck.length > 0 && state.aiHand.length < 6) {
-                    state.aiHand.push(state.aiDeck.shift());
-                    aiAP--; actionTaken = true;
-                    addLog("적이 카드를 뽑았네.");
+                    // AI도 소수 뽑기 건너뜀
+                    const idx = state.aiDeck.findIndex(c => !c.isPrime);
+                    if (idx !== -1) {
+                        state.aiHand.push(state.aiDeck.splice(idx, 1)[0]);
+                        aiAP--; actionTaken = true;
+                        addLog("적이 카드를 뽑았네.");
+                    }
                 }
 
                 if (!actionTaken) break;
@@ -2020,8 +2098,10 @@
             }
             
             await sleep(1000);
-            state.turnCount++; state.isPlayerTurn = true; state.playerAP = 3; state.hasSummoned = false;
+            // 내 턴으로 돌아올 때 AP를 4로 회복
+            state.turnCount++; state.isPlayerTurn = true; state.playerAP = 4; state.hasSummoned = false;
             state.playerField.forEach(c => { if(c) c.ready = true; });
+            showTurnBanner(true);
             updateBaseNumber(); updateUI(); setStatus("자네의 차례일세.");
         }
 
@@ -2046,6 +2126,7 @@
             log.appendChild(item);
             if (log.childNodes.length > 10) log.removeChild(log.firstChild);
         }
+        
         function showEffect(emoji, containerId, slotIdx) {
             const layer = document.getElementById('effect-layer');
             if(!layer) return;
@@ -2096,6 +2177,7 @@
         }
         function checkGameEnd() {
             if (state.playerHP <= 0 || state.aiHP <= 0) {
+                state.isGameOver = true;
                 const win = state.aiHP <= 0;
                 const modal = document.getElementById('result-modal');
                 if(modal) {
@@ -2103,14 +2185,21 @@
                     document.getElementById('result-icon').innerText = win ? '🏆' : '☠️';
                     document.getElementById('result-title').innerText = win ? '승리' : '패배';
                     document.getElementById('result-desc').innerText = win ? "심연의 수수께끼를 풀어냈군." : "자네의 영혼은 숫자의 무덤에 묻혔네.";
+                    
+                    if (state.isPvpMode) {
+                        document.getElementById('result-local-btns').classList.add('hidden');
+                        document.getElementById('result-pvp-btns').classList.remove('hidden');
+                    } else {
+                        document.getElementById('result-local-btns').classList.remove('hidden');
+                        document.getElementById('result-pvp-btns').classList.add('hidden');
+                    }
                 }
                 
-                if (state.isPvpMode && currentRoomId && isHost) {
-                    // 게임 종료 시 방장이 전장 파괴
-                    db.ref('rooms/' + currentRoomId).remove();
+                if (state.isPvpMode && currentRoomId) {
+                    // 방 삭제 대신 종료 상태로 업데이트
+                    db.ref('rooms/' + currentRoomId).update({ status: 'finished' });
                 }
                 state.isTutorial = false;
-                state.isPvpMode = false;
                 return true;
             }
             return false;
